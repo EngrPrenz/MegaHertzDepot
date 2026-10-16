@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: countwise-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: countwise
+      POSTGRES_PASSWORD: countwise_secret
+      POSTGRES_DB: countwise_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U countwise -d countwise_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

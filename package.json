@@ -1,0 +1,21 @@
+{
+  "name": "countwise-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @countwise/server\" \"npm run dev -w @countwise/client\"",
+    "build": "npm run build -w @countwise/shared && npm run build -w @countwise/server && npm run build -w @countwise/client",
+    "test": "npm run test --workspaces --if-present",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run db:migrate -w @countwise/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}

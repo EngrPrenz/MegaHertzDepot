@@ -1,0 +1,122 @@
+import { pool } from './index.js';
+
+export async function runMigrations() {
+  console.log('Running database migrations/table verification...');
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Enable pgcrypto extension for gen_random_uuid
+    await client.query('CREATE EXTENSION IF NOT EXISTS "pgcrypto";');
+
+    // Users
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+
+    // Stores
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS stores (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+
+    // Store Members
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS store_members (
+        store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL DEFAULT 'member',
+        PRIMARY KEY (store_id, user_id)
+      );
+    `);
+
+    // Products
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id UUID PRIMARY KEY,
+        store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        sku TEXT,
+        name_hlc TEXT NOT NULL,
+        sku_hlc TEXT,
+        deleted_at TIMESTAMPTZ,
+        deleted_hlc TEXT,
+        updated_seq BIGINT
+      );
+      CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id);
+    `);
+
+    // Adjustments
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS adjustments (
+        id UUID PRIMARY KEY,
+        product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        delta INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        counted_physical INTEGER,
+        local_stock_at_count INTEGER,
+        created_at BIGINT NOT NULL,
+        hlc TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_adjustments_product_id ON adjustments(product_id);
+      CREATE INDEX IF NOT EXISTS idx_adjustments_store_id ON adjustments(store_id);
+    `);
+
+    // Change Log
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS change_log (
+        seq BIGSERIAL PRIMARY KEY,
+        store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        entity_type TEXT NOT NULL,
+        entity_id UUID NOT NULL,
+        op TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS idx_change_log_store_seq ON change_log(store_id, seq);
+    `);
+
+    // Applied Mutations
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS applied_mutations (
+        mutation_id UUID PRIMARY KEY,
+        device_id TEXT NOT NULL,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+
+    await client.query('COMMIT');
+    console.log('Database tables and indexes verified successfully.');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Migration failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+if (process.argv[1]?.endsWith('migrate.ts') || process.argv[1]?.endsWith('migrate.js')) {
+  runMigrations()
+    .then(() => {
+      console.log('Migration completed.');
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}
