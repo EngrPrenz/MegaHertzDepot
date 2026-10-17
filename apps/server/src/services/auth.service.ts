@@ -1,8 +1,10 @@
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { users, stores, storeMembers } from '../db/schema.js';
+import { isPostgresAvailable, memoryDb } from '../db/memory-fallback.js';
 import { config } from '../config.js';
 import { RegisterInput, LoginInput } from '@countwise/shared';
 
@@ -19,8 +21,54 @@ export interface AuthTokens {
 
 export class AuthService {
   public static async register(input: RegisterInput): Promise<AuthTokens> {
+    const emailLower = input.email.toLowerCase();
+    const usePg = await isPostgresAvailable();
+
+    if (!usePg) {
+      for (const u of memoryDb.users.values()) {
+        if (u.email === emailLower) {
+          throw new Error('User with this email already exists');
+        }
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(input.password, salt);
+
+      const newUser = {
+        id: crypto.randomUUID(),
+        email: emailLower,
+        passwordHash,
+        createdAt: new Date(),
+      };
+      memoryDb.users.set(newUser.id, newUser);
+
+      const newStore = {
+        id: crypto.randomUUID(),
+        name: `${input.name || 'My'} Store`,
+        ownerId: newUser.id,
+        createdAt: new Date(),
+      };
+      memoryDb.stores.set(newStore.id, newStore);
+      memoryDb.storeMembers.push({
+        storeId: newStore.id,
+        userId: newUser.id,
+        role: 'owner',
+      });
+
+      const tokens = this.generateTokens(newUser.id, newUser.email);
+      return {
+        ...tokens,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          createdAt: newUser.createdAt,
+        },
+        defaultStoreId: newStore.id,
+      };
+    }
+
     const existing = await db.query.users.findFirst({
-      where: eq(users.email, input.email.toLowerCase()),
+      where: eq(users.email, emailLower),
     });
 
     if (existing) {
@@ -35,7 +83,7 @@ export class AuthService {
       const [newUser] = await tx
         .insert(users)
         .values({
-          email: input.email.toLowerCase(),
+          email: emailLower,
           passwordHash,
         })
         .returning();
@@ -72,8 +120,33 @@ export class AuthService {
   }
 
   public static async login(input: LoginInput): Promise<AuthTokens> {
+    const emailLower = input.email.toLowerCase();
+    const usePg = await isPostgresAvailable();
+
+    if (!usePg) {
+      const user = Array.from(memoryDb.users.values()).find((u) => u.email === emailLower);
+      if (!user) {
+        throw new Error('Invalid email or password');
+      }
+      const isMatch = await bcrypt.compare(input.password, user.passwordHash);
+      if (!isMatch) {
+        throw new Error('Invalid email or password');
+      }
+      const memberStore = memoryDb.storeMembers.find((m) => m.userId === user.id);
+      const tokens = this.generateTokens(user.id, user.email);
+      return {
+        ...tokens,
+        user: {
+          id: user.id,
+          email: user.email,
+          createdAt: user.createdAt,
+        },
+        defaultStoreId: memberStore?.storeId,
+      };
+    }
+
     const user = await db.query.users.findFirst({
-      where: eq(users.email, input.email.toLowerCase()),
+      where: eq(users.email, emailLower),
     });
 
     if (!user) {

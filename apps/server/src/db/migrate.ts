@@ -47,13 +47,32 @@ export async function runMigrations() {
         store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         sku TEXT,
+        category TEXT NOT NULL DEFAULT 'Peripheral',
+        brand TEXT,
+        price DOUBLE PRECISION NOT NULL DEFAULT 0,
+        cost_price DOUBLE PRECISION,
+        warranty TEXT,
+        specs JSONB,
+        image_url TEXT,
         name_hlc TEXT NOT NULL,
         sku_hlc TEXT,
+        price_hlc TEXT,
+        image_hlc TEXT,
         deleted_at TIMESTAMPTZ,
         deleted_hlc TEXT,
         updated_seq BIGINT
       );
       CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id);
+
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Peripheral';
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS price DOUBLE PRECISION DEFAULT 0;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price DOUBLE PRECISION;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS specs JSONB;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS price_hlc TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS image_hlc TEXT;
     `);
 
     // Adjustments

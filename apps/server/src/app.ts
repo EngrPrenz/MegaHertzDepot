@@ -1,22 +1,36 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import path from 'path';
 import { config } from './config.js';
 import authRoutes from './routes/auth.routes.js';
+import syncRoutes from './routes/sync.routes.js';
+import storeRoutes from './routes/store.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
+import { createRateLimiter } from './middlewares/rateLimit.middleware.js';
 
 export const app = express();
 
-app.use(cors({
-  origin: config.CLIENT_URL.split(','),
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: config.CLIENT_URL.split(','),
+    credentials: true,
+  })
+);
 
-app.use(express.json({ limit: '5mb' }));
+// Serve locally uploaded files statically
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Payload size limit (Section 13 Security Checklist)
+app.use(express.json({ limit: '2mb' }));
+
+const authRateLimiter = createRateLimiter({ windowMs: 60_000, max: 30 });
+const syncRateLimiter = createRateLimiter({ windowMs: 60_000, max: 120 });
 
 // Root info
 app.get('/', (_req: Request, res: Response) => {
   res.json({
     name: 'Countwise Offline-First Sync API',
-    version: '0.1.0',
+    version: '1.0.0',
     status: 'online',
     timestamp: new Date().toISOString(),
   });
@@ -32,7 +46,10 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // Routes
-app.use('/auth', authRoutes);
+app.use('/auth', authRateLimiter, authRoutes);
+app.use('/stores', storeRoutes);
+app.use('/sync', syncRateLimiter, syncRoutes);
+app.use('/upload', uploadRoutes);
 
 // 404 Handler
 app.use((_req: Request, res: Response) => {

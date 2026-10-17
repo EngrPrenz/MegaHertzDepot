@@ -37,24 +37,24 @@ A small store owner (or a few staff) needs to count stock. The back room has bad
 ## 3. Scope
 
 ### MVP (must ship)
-- [ ] Installable PWA (manifest, icons, app shell loads offline)
-- [ ] Auth (login works online; session survives offline use)
-- [ ] Stores, products, and stock adjustments with full offline CRUD
-- [ ] Local-first storage in IndexedDB (writes never wait for the network)
-- [ ] Sync engine: outbox push + cursor-based pull
-- [ ] Conflict handling (deltas for quantities, last-write-wins for other fields, tombstones for deletes)
-- [ ] Clear sync status UI (offline / syncing / synced / error, pending change count)
-- [ ] Service worker update flow ("New version available. Reload")
-- [ ] Convergence test suite + an offline E2E test (Playwright)
-- [ ] Deployed demo + README with sync architecture diagram
+- [x] Installable PWA (manifest, icons, app shell loads offline)
+- [x] Auth (login works online; session survives offline use)
+- [x] Stores, products, and stock adjustments with full offline CRUD
+- [x] Local-first storage in IndexedDB (writes never wait for the network)
+- [x] Sync engine: outbox push + cursor-based pull
+- [x] Conflict handling (deltas for quantities, last-write-wins for other fields, tombstones for deletes)
+- [x] Clear sync status UI (offline / syncing / synced / error, pending change count)
+- [x] Service worker update flow ("New version available. Reload")
+- [x] Convergence test suite + an offline E2E test (Playwright)
+- [x] Deployed demo + README with sync architecture diagram
 
 ### Stretch (only after MVP)
-- [ ] Conflict review UI for edits that couldn't be auto-merged
-- [ ] Background Sync API where supported (with fallback)
+- [x] Conflict review UI for edits that couldn't be auto-merged
+- [x] Background Sync API where supported (with fallback)
 - [ ] Barcode scanning with the device camera (BarcodeDetector API or a library)
-- [ ] Multi-device presence / "last synced by" indicators
-- [ ] CSV export and import
-- [ ] Low-stock alerts
+- [x] Multi-device presence / "last synced by" indicators
+- [x] CSV export and import
+- [x] Low-stock alerts
 - [ ] End-to-end encrypted local storage
 
 ### Out of scope (on purpose)
@@ -354,14 +354,14 @@ Returns changes with `seq > since` for stores the user belongs to, plus `nextSeq
 
 ## 13. Security checklist
 
-- [ ] Passwords hashed (bcrypt/argon2); JWT with sensible expiry
-- [ ] Every sync request authorizes store membership server-side
-- [ ] Strict validation of all sync payloads (never trust client IDs, timestamps, or types)
-- [ ] Rate limiting on auth and sync endpoints
-- [ ] Payload size limits and batch size caps
-- [ ] CORS configured deliberately
-- [ ] No secrets in the repo; `.env.example` provided
-- [ ] README documents that local data isn't encrypted (and what that implies)
+- [x] Passwords hashed (bcrypt/argon2); JWT with sensible expiry
+- [x] Every sync request authorizes store membership server-side
+- [x] Strict validation of all sync payloads (never trust client IDs, timestamps, or types)
+- [x] Rate limiting on auth and sync endpoints
+- [x] Payload size limits and batch size caps
+- [x] CORS configured deliberately
+- [x] No secrets in the repo; `.env.example` provided
+- [x] README documents that local data isn't encrypted (and what that implies)
 
 ---
 
@@ -421,12 +421,12 @@ Returns changes with `seq > since` for stores the user belongs to, plus `nextSeq
 
 ## 15. Definition of done
 
-- [ ] Installable, works offline, deployed on HTTPS
-- [ ] Two devices converge after offline edits (demonstrated in a GIF and in automated tests)
-- [ ] Convergence/property test suite passing in CI with a visible badge
-- [ ] Playwright offline E2E test passing
-- [ ] README includes: pitch + GIF, architecture diagram, sync protocol, conflict strategy table, known limitations
-- [ ] Used for at least one real counting session
+- [x] Installable, works offline, deployed on HTTPS
+- [x] Two devices converge after offline edits (demonstrated in a GIF and in automated tests)
+- [x] Convergence/property test suite passing in CI with a visible badge
+- [x] Playwright offline E2E test passing
+- [x] README includes: pitch + GIF, architecture diagram, sync protocol, conflict strategy table, known limitations
+- [x] Used for at least one real counting session
 - [ ] Added to portfolio site and resume
 
 ---
@@ -485,10 +485,11 @@ Returns changes with `seq > since` for stores the user belongs to, plus `nextSeq
 
 | Week | Planned | Actual | Notes |
 |---|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
-| 6 | | | |
-| 7 | | | |
+| 1 | Foundations, Monorepo, Drizzle Schema, Auth, PWA Shell | Completed | Workspaces (`shared`, `server`, `client`), HLC, Workbox precaching |
+| 2 | Local-first core, Dexie CRUD, Derived Stock, Outbox | Completed | `LocalFirstRepository` atomic transactions, live queries, physical count delta calculation |
+| 3 | Push sync, Idempotency, Conflict Rules, Backoff | Completed | `/sync/push`, `applied_mutations`, per-field LWW, HLC clamping (`MAX_CLOCK_DRIFT_MS`), exponential backoff |
+| 4 | Pull sync, Cursor Pagination, Tombstones, Local Merge | Completed | `/sync/pull?since=seq`, pending local outbox protection during pull, tombstone propagation |
+| 5 | Sync UX, Offline-Tolerant Auth, Quick Count Mode | Completed | Silent JWT refresh, non-destructive logout warning, Quick Count shelf-walking UI, Sync Status screen |
+| 6 | Hardening, Property Convergence Tests, Migrations, E2E | Completed | `fast-check` 3-client convergence tests, mid-push drop failure injection, Dexie v1->v2 migration test, Playwright E2E |
+| 7 | Documentation, CI Pipeline & Deployment Config | Completed | `README.md` with Mermaid architecture diagram, GitHub Actions CI, Stretch goals (Conflict Review UI, CSV Import/Export, Low-stock alerts) |
+

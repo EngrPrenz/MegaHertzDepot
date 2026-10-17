@@ -31,3 +31,7 @@ lerna-debug.log*
 
 # Database & Docker local data
 postgres_data/
+
+# Local disk uploaded media
+apps/server/uploads/*
+!apps/server/uploads/.gitkeep

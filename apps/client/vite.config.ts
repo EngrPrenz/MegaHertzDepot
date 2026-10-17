@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'Countwise - Offline Stock Counting',
-        short_name: 'Countwise',
-        description: 'Offline-first inventory counting with automatic synchronization',
+        name: 'MegaHertz Depot — Offline PC Hardware POS',
+        short_name: 'MegaHertz POS',
+        description: 'Offline-first computer hardware POS, custom rig builder, and stock sync',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
@@ -36,7 +36,20 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: '/index.html',
         // Exclude sync & auth API routes from service worker caching
-        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/sync/],
+        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/sync/, /^\/upload$/],
+        runtimeCaching: [
+          {
+            urlPattern: /^\/uploads\/.*/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'product-images-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+              },
+            },
+          },
+        ],
       },
     }),
   ],
@@ -44,7 +57,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/auth': 'http://localhost:4000',
+      '/stores': 'http://localhost:4000',
       '/sync': 'http://localhost:4000',
+      '/upload': 'http://localhost:4000',
+      '/uploads': 'http://localhost:4000',
       '/health': 'http://localhost:4000',
     },
   },

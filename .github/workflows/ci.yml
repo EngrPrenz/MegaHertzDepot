@@ -1,0 +1,35 @@
+name: Countwise CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    name: Build, Unit, Integration & Convergence Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages (shared, server, client PWA)
+        run: npm run build
+
+      - name: Run HLC, Conflict, Server API & Multi-Client Convergence Tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          FORCE_IN_MEMORY_DB: 'true'
+

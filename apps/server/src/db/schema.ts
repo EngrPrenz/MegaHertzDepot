@@ -5,6 +5,8 @@ import {
   timestamp,
   bigint,
   integer,
+  doublePrecision,
+  boolean,
   bigserial,
   jsonb,
   primaryKey,
@@ -47,7 +49,7 @@ export const storeMembers = pgTable(
   ]
 );
 
-// Products
+// Products (Computer Hardware Catalog)
 export const products = pgTable(
   'products',
   {
@@ -57,8 +59,17 @@ export const products = pgTable(
       .references(() => stores.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     sku: text('sku'),
+    category: text('category').notNull().default('Peripheral'),
+    brand: text('brand'),
+    price: doublePrecision('price').notNull().default(0),
+    costPrice: doublePrecision('cost_price'),
+    warranty: text('warranty'),
+    specs: jsonb('specs'),
+    imageUrl: text('image_url'),
     nameHlc: text('name_hlc').notNull(),
     skuHlc: text('sku_hlc'),
+    priceHlc: text('price_hlc'),
+    imageHlc: text('image_hlc'),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
     deletedHlc: text('deleted_hlc'),
     updatedSeq: bigint('updated_seq', { mode: 'number' }),
@@ -96,6 +107,40 @@ export const adjustments = pgTable(
   ]
 );
 
+// Sale Orders (Append-only POS receipts & warranty records)
+export const saleOrders = pgTable(
+  'sale_orders',
+  {
+    id: uuid('id').primaryKey(), // Client-generated UUID
+    storeId: uuid('store_id')
+      .notNull()
+      .references(() => stores.id, { onDelete: 'cascade' }),
+    receiptNumber: text('receipt_number').notNull(),
+    customerName: text('customer_name'),
+    customerPhone: text('customer_phone'),
+    items: jsonb('items').notNull(), // SaleOrderItem[] with serialNumbers
+    subtotal: doublePrecision('subtotal').notNull(),
+    discountAmount: doublePrecision('discount_amount').notNull().default(0),
+    taxRate: doublePrecision('tax_rate').notNull().default(12),
+    taxInclusive: boolean('tax_inclusive').notNull().default(true),
+    taxAmount: doublePrecision('tax_amount').notNull().default(0),
+    totalAmount: doublePrecision('total_amount').notNull(),
+    paymentMethod: text('payment_method').notNull(),
+    amountTendered: doublePrecision('amount_tendered').notNull(),
+    changeDue: doublePrecision('change_due').notNull().default(0),
+    notes: text('notes'),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    hlc: text('hlc').notNull(),
+    deviceId: text('device_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    index('idx_sale_orders_store_id').on(table.storeId),
+  ]
+);
+
 // Change Log (Monotonic seq sequence authority)
 export const changeLog = pgTable(
   'change_log',
@@ -104,7 +149,7 @@ export const changeLog = pgTable(
     storeId: uuid('store_id')
       .notNull()
       .references(() => stores.id, { onDelete: 'cascade' }),
-    entityType: text('entity_type').notNull(), // 'product' | 'adjustment'
+    entityType: text('entity_type').notNull(), // 'product' | 'adjustment' | 'order'
     entityId: uuid('entity_id').notNull(),
     op: text('op').notNull(), // 'upsert' | 'delete'
     payload: jsonb('payload').notNull(),
@@ -136,6 +181,7 @@ export const storesRelations = relations(stores, ({ one, many }) => ({
   members: many(storeMembers),
   products: many(products),
   adjustments: many(adjustments),
+  saleOrders: many(saleOrders),
   changeLogs: many(changeLog),
 }));
 
