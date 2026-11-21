@@ -6,6 +6,8 @@ const router = Router();
 
 router.post('/register', AuthController.register);
 router.post('/login', AuthController.login);
+router.post('/customer/register', AuthController.registerCustomer);
+router.post('/customer/login', AuthController.loginCustomer);
 router.post('/refresh', AuthController.refresh);
 router.get('/me', authenticateJwt, AuthController.me);
 

@@ -48,6 +48,36 @@ export class AuthController {
     }
   }
 
+  public static async registerCustomer(req: Request, res: Response): Promise<void> {
+    try {
+      const validated = registerSchema.safeParse(req.body);
+      if (!validated.success) {
+        res.status(400).json({ error: 'Validation failed', details: validated.error.errors });
+        return;
+      }
+
+      const result = await AuthService.register(validated.data, 'customer');
+      res.status(201).json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || 'Registration failed' });
+    }
+  }
+
+  public static async loginCustomer(req: Request, res: Response): Promise<void> {
+    try {
+      const validated = loginSchema.safeParse(req.body);
+      if (!validated.success) {
+        res.status(400).json({ error: 'Validation failed', details: validated.error.errors });
+        return;
+      }
+
+      const result = await AuthService.login(validated.data, 'customer');
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(401).json({ error: error.message || 'Login failed' });
+    }
+  }
+
   public static async me(req: Request, res: Response): Promise<void> {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });

@@ -28,7 +28,9 @@ import {
   Fan,
   Monitor,
   MousePointer,
+  Laptop,
   HelpCircle,
+  Copy,
 } from 'lucide-react';
 
 interface PcBuilderPageProps {
@@ -37,6 +39,14 @@ interface PcBuilderPageProps {
   currencySymbol: string;
   onLoadBuildToCart: (parts: ProductLocal[]) => void;
 }
+
+// Categories that allow equipping multiple components simultaneously (e.g. CPU Cooler + Case Fans + Thermal Paste, NVMe + SATA SSD/HDD, Mouse + Keyboard + Headset)
+const MULTI_SLOT_CATEGORIES = new Set<HardwareCategory>([
+  'Cooling',
+  'Storage',
+  'Peripheral',
+  'Monitor',
+]);
 
 export function PcBuilderPage({
   storeId,
@@ -47,14 +57,20 @@ export function PcBuilderPage({
   // Currently active hardware category being browsed
   const [activeCategory, setActiveCategory] = useState<HardwareCategory>('CPU');
   const [categorySearch, setCategorySearch] = useState('');
+  const [sortBy, setSortBy] = useState<
+    'featured' | 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc'
+  >('featured');
+  const [selectedBrand, setSelectedBrand] = useState<string>('All');
+  const [inStockOnly, setInStockOnly] = useState(false);
 
-  // Selected hardware item ID per slot
+  // Selected hardware item IDs per slot (supports multi-install for Cooling, Storage, Peripheral, Monitor)
   const [selectedBySlot, setSelectedBySlot] = useState<
-    Partial<Record<HardwareCategory, string>>
+    Partial<Record<HardwareCategory, string[]>>
   >({});
   const [customerName, setCustomerName] = useState('');
   const [bundleDiscount, setBundleDiscount] = useState('0');
   const [activeQuote, setActiveQuote] = useState<QuoteBuildData | null>(null);
+  const [copiedBuild, setCopiedBuild] = useState(false);
 
   const products = useLiveQuery(
     () =>
@@ -96,15 +112,21 @@ export function PcBuilderPage({
   }, [products]);
 
   const resolvedBuild = useMemo(() => {
-    const record: Partial<Record<HardwareCategory, ProductLocal>> = {};
+    const record: Partial<Record<HardwareCategory, ProductLocal | ProductLocal[]>> = {};
     const list: Array<{ slot: HardwareCategory; product: ProductLocal }> = [];
     for (const cat of HARDWARE_CATEGORIES) {
-      const pid = selectedBySlot[cat];
-      if (!pid) continue;
-      const found = products.find((p) => p.id === pid);
-      if (found) {
-        record[cat] = found;
-        list.push({ slot: cat, product: found });
+      const pids = selectedBySlot[cat];
+      if (!pids || pids.length === 0) continue;
+      const foundList: ProductLocal[] = [];
+      for (const pid of pids) {
+        const found = products.find((p) => p.id === pid);
+        if (found) {
+          foundList.push(found);
+          list.push({ slot: cat, product: found });
+        }
+      }
+      if (foundList.length > 0) {
+        record[cat] = MULTI_SLOT_CATEGORIES.has(cat) ? foundList : foundList[0];
       }
     }
     return { record, list };
@@ -123,7 +145,7 @@ export function PcBuilderPage({
 
   // Quick preset loader
   const handleAutoPreset = (platform: 'AM5' | 'LGA1700') => {
-    const next: Partial<Record<HardwareCategory, string>> = {};
+    const next: Partial<Record<HardwareCategory, string[]>> = {};
     const cpu = products.find(
       (p) => p.category === 'CPU' && p.specs?.socket?.toUpperCase() === platform
     );
@@ -138,31 +160,60 @@ export function PcBuilderPage({
     const storage = products.find((p) => p.category === 'Storage');
     const psu = products.find((p) => p.category === 'PSU');
     const pcCase = products.find((p) => p.category === 'Case');
-    const cooler = products.find((p) => p.category === 'Cooling');
+    const cooler = products.find(
+      (p) =>
+        p.category === 'Cooling' &&
+        !p.name.toLowerCase().includes('case fan') &&
+        !p.name.toLowerCase().includes('thermal paste')
+    );
+    const caseFans = products.find(
+      (p) => p.category === 'Cooling' && p.name.toLowerCase().includes('case fan')
+    );
 
-    if (cpu) next.CPU = cpu.id;
-    if (mobo) next.Motherboard = mobo.id;
-    if (ram) next.RAM = ram.id;
-    if (gpu) next.GPU = gpu.id;
-    if (storage) next.Storage = storage.id;
-    if (psu) next.PSU = psu.id;
-    if (pcCase) next.Case = pcCase.id;
-    if (cooler) next.Cooling = cooler.id;
+    if (cpu) next.CPU = [cpu.id];
+    if (mobo) next.Motherboard = [mobo.id];
+    if (ram) next.RAM = [ram.id];
+    if (gpu) next.GPU = [gpu.id];
+    if (storage) next.Storage = [storage.id];
+    if (psu) next.PSU = [psu.id];
+    if (pcCase) next.Case = [pcCase.id];
+    if (cooler || caseFans) {
+      next.Cooling = [cooler?.id, caseFans?.id].filter((id): id is string => Boolean(id));
+    }
 
     setSelectedBySlot(next);
   };
 
   const handleSelectPart = (cat: HardwareCategory, productId: string) => {
-    setSelectedBySlot((prev) => ({
-      ...prev,
-      [cat]: productId,
-    }));
+    setSelectedBySlot((prev) => {
+      const current = prev[cat] || [];
+      if (MULTI_SLOT_CATEGORIES.has(cat)) {
+        if (current.includes(productId)) return prev;
+        return {
+          ...prev,
+          [cat]: [...current, productId],
+        };
+      }
+      return {
+        ...prev,
+        [cat]: [productId],
+      };
+    });
   };
 
-  const handleRemovePart = (cat: HardwareCategory) => {
+  const handleRemovePart = (cat: HardwareCategory, productId?: string) => {
     setSelectedBySlot((prev) => {
       const next = { ...prev };
-      delete next[cat];
+      if (!productId || !next[cat]) {
+        delete next[cat];
+        return next;
+      }
+      const filtered = next[cat]!.filter((id) => id !== productId);
+      if (filtered.length === 0) {
+        delete next[cat];
+      } else {
+        next[cat] = filtered;
+      }
       return next;
     });
   };
@@ -185,24 +236,93 @@ export function PcBuilderPage({
     });
   };
 
-  // Filter products for active category browser
+  const handleCopyBuildList = async () => {
+    if (resolvedBuild.list.length === 0) return;
+    const lines = [
+      `MEGAHERTZ DEPOT — CUSTOM PC RIG QUOTATION (${storeName})`,
+      `Client: ${customerName.trim() || 'Walk-in PC Builder'}`,
+      `Compatibility: ${compatibility.isCompatible ? 'VERIFIED' : 'CHECK WARNINGS'} (${compatibility.estimatedSystemWatts}W Est. Load | Rec. PSU: ${compatibility.recommendedPsuWatts}W+)`,
+      '--------------------------------------------',
+      ...resolvedBuild.list.map(
+        ({ slot, product }) =>
+          `[${slot}] ${product.name} — ${formatCurrency(product.price || 0, currencySymbol)}`
+      ),
+      '--------------------------------------------',
+      `Quoted Total: ${formatCurrency(totalAmount, currencySymbol)}`,
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'));
+      setCopiedBuild(true);
+      setTimeout(() => setCopiedBuild(false), 2500);
+    } catch {
+      // Fallback
+    }
+  };
+
+  // Available brands in the currently active category
+  const activeCategoryBrands = useMemo(() => {
+    const list = productsByCategory.get(activeCategory) || [];
+    const brands = new Set<string>();
+    for (const p of list) {
+      if (p.brand && p.brand.trim()) {
+        brands.add(p.brand.trim());
+      }
+    }
+    return Array.from(brands).sort((a, b) => a.localeCompare(b));
+  }, [productsByCategory, activeCategory]);
+
+  // Filter & sort products for active category browser
   const activeCategoryProducts = useMemo(() => {
     const list = productsByCategory.get(activeCategory) || [];
-    if (!categorySearch.trim()) return list;
-    const q = categorySearch.toLowerCase();
-    return list.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.brand && p.brand.toLowerCase().includes(q)) ||
-        (p.sku && p.sku.toLowerCase().includes(q))
-    );
-  }, [productsByCategory, activeCategory, categorySearch]);
+    const q = categorySearch.trim().toLowerCase();
+
+    return list
+      .filter((p) => {
+        if (inStockOnly && (stockByProduct.get(p.id) ?? 0) <= 0) {
+          return false;
+        }
+        if (
+          selectedBrand !== 'All' &&
+          (p.brand || '').trim().toLowerCase() !== selectedBrand.toLowerCase()
+        ) {
+          return false;
+        }
+        if (q) {
+          const matchName = p.name.toLowerCase().includes(q);
+          const matchBrand = p.brand ? p.brand.toLowerCase().includes(q) : false;
+          const matchSku = p.sku ? p.sku.toLowerCase().includes(q) : false;
+          const matchSocket = p.specs?.socket ? p.specs.socket.toLowerCase().includes(q) : false;
+          const matchRam = p.specs?.ramType ? p.specs.ramType.toLowerCase().includes(q) : false;
+          if (!matchName && !matchBrand && !matchSku && !matchSocket && !matchRam) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'price-asc') return (a.price ?? 0) - (b.price ?? 0);
+        if (sortBy === 'price-desc') return (b.price ?? 0) - (a.price ?? 0);
+        if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
+        if (sortBy === 'name-desc') return b.name.localeCompare(a.name);
+        return 0; // 'featured' preserves catalog order
+      });
+  }, [
+    productsByCategory,
+    activeCategory,
+    categorySearch,
+    sortBy,
+    selectedBrand,
+    inStockOnly,
+    stockByProduct,
+  ]);
 
   // Helper to check individual part compatibility note relative to current build
   const getPartCompatibilityNote = (part: ProductLocal) => {
-    const selectedCpu = resolvedBuild.record.CPU;
-    const selectedMobo = resolvedBuild.record.Motherboard;
-    const selectedRam = resolvedBuild.record.RAM;
+    const firstPart = (val?: ProductLocal | ProductLocal[]) =>
+      Array.isArray(val) ? val[0] : val;
+    const selectedCpu = firstPart(resolvedBuild.record.CPU);
+    const selectedMobo = firstPart(resolvedBuild.record.Motherboard);
+    const selectedRam = firstPart(resolvedBuild.record.RAM);
 
     // Check CPU compatibility with selected Mobo
     if (part.category === 'CPU' && selectedMobo?.specs?.socket && part.specs?.socket) {
@@ -273,6 +393,8 @@ export function PcBuilderPage({
         return <Monitor className="w-5 h-5 text-amber-400" />;
       case 'Peripheral':
         return <MousePointer className="w-5 h-5 text-amber-400" />;
+      case 'Laptop':
+        return <Laptop className="w-5 h-5 text-amber-400" />;
     }
   };
 
@@ -330,6 +452,7 @@ export function PcBuilderPage({
             onSelectCategory={(cat) => {
               setActiveCategory(cat);
               setCategorySearch('');
+              setSelectedBrand('All');
             }}
             onRemovePart={handleRemovePart}
             currencySymbol={currencySymbol}
@@ -338,78 +461,157 @@ export function PcBuilderPage({
 
         {/* Right 6 Columns: Focused Hardware Component Browser */}
         <div className="lg:col-span-6 xl:col-span-7 space-y-4">
-          <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 space-y-3">
+          <div className="bg-stone-900 border border-stone-800 rounded-2xl p-5 space-y-4">
             {/* Browser Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-stone-950 border border-stone-800">
+            <div className="space-y-3 border-b border-stone-800 pb-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-xl bg-stone-950 border border-stone-800 shrink-0">
                   {getCategoryIcon(activeCategory)}
                 </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                <div className="space-y-1 min-w-0">
+                  <h3 className="font-bold text-white text-base flex flex-wrap items-center gap-2">
                     <span>Select {activeCategory} Component</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-stone-950 text-stone-400 border border-stone-800">
+                    <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-stone-950 text-stone-300 border border-stone-800">
                       {activeCategoryProducts.length} in inventory
                     </span>
+                    {MULTI_SLOT_CATEGORIES.has(activeCategory) && (
+                      <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        Multi-Slot Enabled
+                      </span>
+                    )}
                   </h3>
-                  <p className="text-[11px] text-stone-400">
-                    Click "Install Component" to slot into your PC chassis build
+                  <p className="text-xs text-stone-400 leading-relaxed">
+                    {activeCategory === 'Cooling'
+                      ? 'You can install multiple cooling components (e.g. CPU Air/AIO Cooler + Case Fans + Thermal Paste)'
+                      : MULTI_SLOT_CATEGORIES.has(activeCategory)
+                      ? `You can install multiple ${activeCategory.toLowerCase()} items simultaneously in your build`
+                      : 'Click "Install" to slot into your PC chassis build'}
                   </p>
                 </div>
               </div>
 
-              {/* Quick Search within this category */}
-              <div className="relative w-full sm:w-48">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
-                <input
-                  type="text"
-                  placeholder={`Search ${activeCategory}...`}
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-white placeholder-stone-500 focus:outline-none focus:border-amber-500"
-                />
+              {/* Dedicated Toolbar Row: Quick Search, Sort & Filters */}
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+                  <input
+                    type="text"
+                    placeholder={`Search ${activeCategory} by name, brand, or specs...`}
+                    value={categorySearch}
+                    onChange={(e) => setCategorySearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-white placeholder-stone-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Brand Filter Dropdown */}
+                {activeCategoryBrands.length > 1 && (
+                  <select
+                    aria-label="Filter by brand"
+                    value={selectedBrand}
+                    onChange={(e) => setSelectedBrand(e.target.value)}
+                    className="px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                  >
+                    <option value="All">All Brands</option>
+                    {activeCategoryBrands.map((brand) => (
+                      <option key={brand} value={brand}>
+                        {brand}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Sort Dropdown (Price Low/High & Name A-Z/Z-A) */}
+                <select
+                  aria-label="Sort components"
+                  value={sortBy}
+                  onChange={(e) =>
+                    setSortBy(
+                      e.target.value as
+                        | 'featured'
+                        | 'price-asc'
+                        | 'price-desc'
+                        | 'name-asc'
+                        | 'name-desc'
+                    )
+                  }
+                  className="px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="featured">Sort: Featured</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="name-asc">Name: A to Z</option>
+                  <option value="name-desc">Name: Z to A</option>
+                </select>
+
+                {/* In-Stock Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setInStockOnly((v) => !v)}
+                  className={`px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                    inStockOnly
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                      : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-white'
+                  }`}
+                  title="Show only in-stock components"
+                >
+                  In Stock
+                </button>
               </div>
             </div>
 
-            {/* Currently Installed Part for this Slot Banner */}
-            {resolvedBuild.record[activeCategory] && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <div className="min-w-0 text-xs">
-                    <span className="font-bold text-white truncate block">
-                      Installed: {resolvedBuild.record[activeCategory]?.name}
-                    </span>
-                    <span className="font-mono text-amber-400 font-bold text-[11px]">
-                      {formatCurrency(resolvedBuild.record[activeCategory]?.price || 0, currencySymbol)}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemovePart(activeCategory)}
-                  className="px-2 py-1 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-700 text-stone-300 hover:text-rose-400 text-xs font-semibold shrink-0 transition cursor-pointer"
-                >
-                  Remove from Slot
-                </button>
+            {/* Currently Installed Part(s) for this Slot Banner */}
+            {resolvedBuild.list.some((item) => item.slot === activeCategory) && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2.5">
+                {resolvedBuild.list
+                  .filter((item) => item.slot === activeCategory)
+                  .map(({ product: installedPart }, idx) => (
+                    <div
+                      key={installedPart.id}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                        <div className="min-w-0 space-y-0.5">
+                          <span className="font-bold text-white text-xs sm:text-sm block leading-snug">
+                            {MULTI_SLOT_CATEGORIES.has(activeCategory)
+                              ? `Installed #${idx + 1}: ${installedPart.name}`
+                              : `Installed: ${installedPart.name}`}
+                          </span>
+                          <span className="font-mono text-amber-400 font-bold text-xs block">
+                            {formatCurrency(installedPart.price || 0, currencySymbol)}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePart(activeCategory, installedPart.id)}
+                        className="px-2.5 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-700 text-stone-300 hover:text-rose-400 text-xs font-semibold shrink-0 transition cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
               </div>
             )}
 
             {/* Product Items List / Cards */}
-            <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1.5">
               {activeCategoryProducts.length === 0 ? (
                 <div className="p-8 text-center text-stone-500 space-y-2">
                   <HelpCircle className="w-8 h-8 text-stone-600 mx-auto" />
-                  <p className="text-xs font-semibold text-stone-400">
+                  <p className="text-sm font-semibold text-stone-400">
                     No components found in {activeCategory} category
                   </p>
-                  <p className="text-[11px] text-stone-600">
+                  <p className="text-xs text-stone-500">
                     Clear your search term or add products in the Admin catalog.
                   </p>
                 </div>
               ) : (
                 activeCategoryProducts.map((product) => {
-                  const isSelected = selectedBySlot[activeCategory] === product.id;
+                  const isSelected = Boolean(
+                    selectedBySlot[activeCategory]?.includes(product.id)
+                  );
                   const stock = stockByProduct.get(product.id) ?? 0;
                   const isOutOfStock = stock <= 0;
                   const compatNote = getPartCompatibilityNote(product);
@@ -417,51 +619,56 @@ export function PcBuilderPage({
                   return (
                     <div
                       key={product.id}
-                      className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
+                      className={`p-3.5 sm:p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
                         isSelected
                           ? 'bg-amber-500/15 border-amber-500 shadow-md shadow-amber-950/20'
                           : 'bg-stone-950 border-stone-800 hover:border-stone-700'
                       }`}
                     >
                       {/* Product Thumbnail & Details */}
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
                         <ProductImage
                           imageUrl={product.imageUrl}
                           name={product.name}
                           category={product.category}
-                          className="w-12 h-12 rounded-xl shrink-0"
+                          className="w-14 h-14 rounded-xl shrink-0"
                         />
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white text-xs truncate">
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <span className="font-bold text-white text-sm leading-snug">
                               {product.name}
                             </span>
                             {product.brand && (
-                              <span className="text-[10px] text-stone-400 shrink-0 font-medium">
+                              <span className="text-xs text-stone-400 shrink-0 font-medium">
                                 • {product.brand}
                               </span>
                             )}
                           </div>
 
                           {/* Specs Chips */}
-                          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
                             {product.specs?.socket && (
-                              <span className="px-1.5 py-0.2 rounded bg-stone-800 text-stone-300 font-mono border border-stone-700">
+                              <span className="px-2 py-0.5 rounded-md bg-stone-800 text-stone-200 font-mono text-[11px] border border-stone-700">
                                 {product.specs.socket}
                               </span>
                             )}
                             {product.specs?.ramType && (
-                              <span className="px-1.5 py-0.2 rounded bg-stone-800 text-stone-300 font-mono border border-stone-700">
+                              <span className="px-2 py-0.5 rounded-md bg-stone-800 text-stone-200 font-mono text-[11px] border border-stone-700">
                                 {product.specs.ramType}
                               </span>
                             )}
-                            {product.specs?.wattage && (
-                              <span className="px-1.5 py-0.2 rounded bg-stone-800 text-stone-300 font-mono border border-stone-700">
-                                {product.specs.wattage}W
+                            {product.specs?.formFactor && (
+                              <span className="px-2 py-0.5 rounded-md bg-stone-800 text-stone-200 font-mono text-[11px] border border-stone-700">
+                                {product.specs.formFactor}
                               </span>
                             )}
+                            {product.specs?.wattage ? (
+                              <span className="px-2 py-0.5 rounded-md bg-stone-800 text-stone-200 font-mono text-[11px] border border-stone-700">
+                                {product.specs.wattage}W
+                              </span>
+                            ) : null}
                             <span
-                              className={`font-mono ${
+                              className={`font-mono text-xs ${
                                 isOutOfStock ? 'text-rose-400' : 'text-stone-400'
                               }`}
                             >
@@ -472,14 +679,14 @@ export function PcBuilderPage({
                           {/* Real-time compatibility notice tag */}
                           {compatNote && (
                             <div
-                              className={`text-[10px] font-semibold flex items-center gap-1 ${
+                              className={`text-xs font-semibold flex items-center gap-1.5 pt-0.5 ${
                                 compatNote.isMatch ? 'text-emerald-400' : 'text-amber-400'
                               }`}
                             >
                               {compatNote.isMatch ? (
-                                <Check className="w-3 h-3 shrink-0" />
+                                <Check className="w-3.5 h-3.5 shrink-0" />
                               ) : (
-                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                               )}
                               <span>{compatNote.text}</span>
                             </div>
@@ -488,25 +695,25 @@ export function PcBuilderPage({
                       </div>
 
                       {/* Price & Action Button */}
-                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-stone-800/80">
-                        <span className="text-sm font-extrabold text-amber-400 font-mono">
+                      <div className="flex items-center justify-between sm:justify-end gap-3.5 shrink-0 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-stone-800/80">
+                        <span className="text-base font-extrabold text-amber-400 font-mono">
                           {formatCurrency(product.price || 0, currencySymbol)}
                         </span>
 
                         {isSelected ? (
                           <button
                             type="button"
-                            onClick={() => handleRemovePart(activeCategory)}
-                            className="px-3 py-1.5 rounded-xl bg-amber-500 text-stone-950 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                            onClick={() => handleRemovePart(activeCategory, product.id)}
+                            className="px-3.5 py-2 rounded-xl bg-amber-500 text-stone-950 font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-4 h-4" />
                             <span>Installed</span>
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleSelectPart(activeCategory, product.id)}
-                            className="px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 active:scale-95 text-stone-200 hover:text-white border border-stone-700 font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer transition"
+                            className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 active:scale-95 text-stone-200 hover:text-white border border-stone-700 font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer transition"
                           >
                             <span>Install</span>
                           </button>
@@ -656,16 +863,37 @@ export function PcBuilderPage({
               <span>Add Rig to Order Cart</span>
             </button>
 
-            <button
-              type="button"
-              disabled={resolvedBuild.list.length === 0}
-              onClick={handleOpenQuote}
-              data-testid="generate-quote-btn"
-              className="w-full py-2 px-3 rounded-xl bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-300 hover:text-white font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer transition border border-stone-700"
-            >
-              <FileText className="w-3.5 h-3.5 text-stone-400" />
-              <span>Printable PDF Quote</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={resolvedBuild.list.length === 0}
+                onClick={handleOpenQuote}
+                data-testid="generate-quote-btn"
+                className="w-full py-2 px-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-200 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition border border-stone-700"
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Printable Quote</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={resolvedBuild.list.length === 0}
+                onClick={handleCopyBuildList}
+                className="w-full py-2 px-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-stone-200 hover:text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition border border-stone-700"
+              >
+                {copiedBuild ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-emerald-300">Copied Specs!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>Copy Build List</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

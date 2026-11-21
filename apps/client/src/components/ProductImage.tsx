@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { HardwareCategory } from '@countwise/shared';
+import React, { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { HardwareCategory, getDefaultCatalogImageUrl } from '@countwise/shared';
+import { localDb } from '../db/index.js';
+import { isLocalImageUri, extractLocalImageId } from '../services/imageService.js';
 import {
   Cpu,
   Layers,
@@ -11,10 +14,12 @@ import {
   MousePointer,
   Server,
   Sparkles,
+  Laptop,
 } from 'lucide-react';
 
 interface ProductImageProps {
   imageUrl?: string | null;
+  sku?: string | null;
   name: string;
   category?: HardwareCategory | string;
   className?: string;
@@ -100,6 +105,13 @@ const CATEGORY_THEMES: Record<string, CategoryTheme> = {
     badgeText: 'text-stone-300',
     iconColor: 'text-amber-400',
   },
+  Laptop: {
+    icon: Laptop,
+    accentBorder: 'border-stone-800',
+    badgeBg: 'bg-stone-800/80',
+    badgeText: 'text-stone-300',
+    iconColor: 'text-amber-400',
+  },
 };
 
 function getInitials(name: string): string {
@@ -114,6 +126,7 @@ function getInitials(name: string): string {
 
 export function ProductImage({
   imageUrl,
+  sku,
   name,
   category = 'Peripheral',
   className = 'w-16 h-16',
@@ -122,29 +135,57 @@ export function ProductImage({
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const isLocalIdb = isLocalImageUri(imageUrl);
+  const localImageId = isLocalIdb && imageUrl ? extractLocalImageId(imageUrl) : null;
+
+  // Query IndexedDB `productImages` table when `local-img://<id>` is used
+  const localRecord = useLiveQuery(
+    async () => {
+      if (!localImageId) return undefined;
+      return localDb.productImages.get(localImageId);
+    },
+    [localImageId],
+    undefined
+  );
+
+  // Resolve effective image URL:
+  // 1. Local IndexedDB blob dataUrl if `local-img://`
+  // 2. Direct URL / public static path if standard string
+  // 3. Automatic fallback to static `/images/products/<SKU>.svg` if SKU or Name matches catalog
+  const catalogFallbackUrl = getDefaultCatalogImageUrl(sku, name);
+  const resolvedSrc = isLocalIdb
+    ? localRecord?.dataUrl || catalogFallbackUrl || null
+    : imageUrl || catalogFallbackUrl || null;
+
+  useEffect(() => {
+    setHasError(false);
+    setIsLoaded(false);
+  }, [resolvedSrc]);
+
   const theme = CATEGORY_THEMES[category] || CATEGORY_THEMES.Peripheral;
   const CategoryIcon = theme.icon;
   const initials = getInitials(name);
 
-  // If valid image and not errored, render img with fallback
-  if (imageUrl && !hasError) {
+  const isInlineDataUrl = Boolean(resolvedSrc && resolvedSrc.startsWith('data:'));
+
+  // If valid resolved image and not errored, render img with fallback
+  if (resolvedSrc && !hasError) {
     return (
       <div
         className={`relative overflow-hidden rounded-xl bg-stone-900 border border-stone-800/80 flex items-center justify-center ${className}`}
       >
-        {!isLoaded && (
+        {!isLoaded && !isInlineDataUrl && (
           <div className="absolute inset-0 flex items-center justify-center animate-pulse bg-stone-900">
             <CategoryIcon className="w-5 h-5 text-stone-600 opacity-40" />
           </div>
         )}
         <img
-          src={imageUrl}
+          src={resolvedSrc}
           alt={alt || name}
-          loading="lazy"
           onLoad={() => setIsLoaded(true)}
           onError={() => setHasError(true)}
-          className={`w-full h-full object-cover transition-all duration-300 ${
-            isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          className={`w-full h-full object-cover transition-all duration-200 ${
+            isLoaded || isInlineDataUrl ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}
         />
       </div>

@@ -130,9 +130,9 @@ export class StoreService {
     storeId: string,
     memberEmail: string
   ): Promise<{ storeId: string; userId: string; email: string; role: string }> {
-    const isMember = await this.isUserStoreMember(requesterId, storeId);
-    if (!isMember) {
-      throw new Error('Forbidden: you are not a member of this store');
+    const isOwner = await this.isUserStoreOwner(requesterId, storeId);
+    if (!isOwner) {
+      throw new Error('Forbidden: only store owners can add members');
     }
 
     const emailLower = memberEmail.trim().toLowerCase();
@@ -141,7 +141,7 @@ export class StoreService {
     if (!usePg) {
       const targetUser = Array.from(memoryDb.users.values()).find((u) => u.email === emailLower);
       if (!targetUser) {
-        throw new Error('User with that email was not found');
+        throw new Error('Unable to add member for that email address');
       }
       const existing = memoryDb.storeMembers.find(
         (m) => m.storeId === storeId && m.userId === targetUser.id
@@ -161,7 +161,7 @@ export class StoreService {
     });
 
     if (!targetUser) {
-      throw new Error('User with that email was not found');
+      throw new Error('Unable to add member for that email address');
     }
 
     await db
@@ -174,6 +174,24 @@ export class StoreService {
       .onConflictDoNothing();
 
     return { storeId, userId: targetUser.id, email: targetUser.email, role: 'member' };
+  }
+
+  public static async isUserStoreOwner(userId: string, storeId: string): Promise<boolean> {
+    const usePg = await isPostgresAvailable();
+    if (!usePg) {
+      return memoryDb.storeMembers.some(
+        (m) => m.storeId === storeId && m.userId === userId && m.role === 'owner'
+      );
+    }
+
+    const membership = await db.query.storeMembers.findFirst({
+      where: and(
+        eq(storeMembers.storeId, storeId),
+        eq(storeMembers.userId, userId),
+        eq(storeMembers.role, 'owner')
+      ),
+    });
+    return Boolean(membership);
   }
 
   public static async isUserStoreMember(userId: string, storeId: string): Promise<boolean> {

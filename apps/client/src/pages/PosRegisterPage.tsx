@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb, ProductLocal, SaleOrderLocal } from '../db/index.js';
 import { localRepository } from '../services/localRepository.js';
@@ -8,6 +8,7 @@ import {
   HARDWARE_CATEGORIES,
   HardwareCategory,
   PaymentMethod,
+  SAMPLE_PC_HARDWARE_CATALOG,
   formatCurrency,
 } from '@countwise/shared';
 import {
@@ -67,6 +68,17 @@ export function PosRegisterPage({
   const [amountTenderedInput, setAmountTenderedInput] = useState('');
   const [completedOrder, setCompletedOrder] = useState<SaleOrderLocal | null>(null);
   const [seeding, setSeeding] = useState(false);
+
+  // USB / Keyboard-Wedge Barcode Scanner State
+  const [scannerMode, setScannerMode] = useState(true);
+  const [scanFeedback, setScanFeedback] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const scanBufferRef = useRef<{ chars: string; lastKeyTime: number }>({
+    chars: '',
+    lastKeyTime: 0,
+  });
 
   const products = useLiveQuery(
     () =>
@@ -256,11 +268,100 @@ export function PosRegisterPage({
     setCompletedOrder(order);
   };
 
+  // Barcode / Quick-SKU Ring-Up Handler
+  const handleBarcodeRingUp = (rawCode: string): boolean => {
+    const code = rawCode.trim().toLowerCase();
+    if (!code) return false;
+
+    // 1. Exact SKU match
+    const exactSkuMatch = products.find((p) => p.sku && p.sku.toLowerCase() === code);
+    if (exactSkuMatch) {
+      addToCart(exactSkuMatch);
+      setScanFeedback({
+        type: 'success',
+        text: `Scanned [${exactSkuMatch.sku}] • Added "${exactSkuMatch.name}" to cart`,
+      });
+      setTimeout(() => setScanFeedback(null), 3000);
+      return true;
+    }
+
+    // 2. Single filtered match or partial SKU match
+    const partialSkuMatch = products.filter(
+      (p) =>
+        (p.sku && p.sku.toLowerCase().includes(code)) ||
+        p.name.toLowerCase().includes(code)
+    );
+    if (partialSkuMatch.length === 1) {
+      const target = partialSkuMatch[0];
+      addToCart(target);
+      setScanFeedback({
+        type: 'success',
+        text: `Matched [${target.sku || target.name}] • Added "${target.name}" to cart`,
+      });
+      setTimeout(() => setScanFeedback(null), 3000);
+      return true;
+    }
+
+    setScanFeedback({
+      type: 'error',
+      text:
+        partialSkuMatch.length > 1
+          ? `Multiple items match "${rawCode.trim()}" — click the desired item below`
+          : `No hardware SKU found matching barcode "${rawCode.trim()}"`,
+    });
+    setTimeout(() => setScanFeedback(null), 3500);
+    return false;
+  };
+
+  // Global USB Keyboard-Wedge Barcode Scanner Listener (detects rapid keystrokes < 60ms apart ending in Enter)
+  useEffect(() => {
+    if (!scannerMode) return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isInputFocused =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+
+      if (isInputFocused) return;
+
+      const now = Date.now();
+      const elapsed = now - scanBufferRef.current.lastKeyTime;
+
+      if (e.key === 'Enter') {
+        if (scanBufferRef.current.chars.length >= 3 && elapsed < 150) {
+          e.preventDefault();
+          const scanned = scanBufferRef.current.chars;
+          scanBufferRef.current.chars = '';
+          handleBarcodeRingUp(scanned);
+        } else {
+          scanBufferRef.current.chars = '';
+        }
+        return;
+      }
+
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (elapsed > 120) {
+          scanBufferRef.current.chars = e.key;
+        } else {
+          scanBufferRef.current.chars += e.key;
+        }
+        scanBufferRef.current.lastKeyTime = now;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [scannerMode, products]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
       {/* Left 7 Columns: Hardware Catalog Grid */}
       <div className="lg:col-span-7 space-y-4">
-        {/* Search & Seed Bar */}
+        {/* Search, Barcode Scanner Toggle & Seed Bar */}
         <div className="flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
@@ -268,13 +369,34 @@ export function PosRegisterPage({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search CPU, GPU, RAM, SKU, or socket (e.g. AM5, DDR5, 4070)..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && search.trim()) {
+                  e.preventDefault();
+                  const added = handleBarcodeRingUp(search);
+                  if (added) setSearch('');
+                }
+              }}
+              placeholder="Scan barcode / SKU or search hardware (press Enter to quick-add)..."
               data-testid="pos-search-input"
               className="w-full bg-stone-900/90 border border-stone-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
             />
           </div>
 
-          {products.length === 0 && (
+          <button
+            type="button"
+            onClick={() => setScannerMode((v) => !v)}
+            title="Toggle USB / Keyboard-Wedge Barcode Scanner Listener"
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer shrink-0 ${
+              scannerMode
+                ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
+                : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-white'
+            }`}
+          >
+            <Barcode className="w-4 h-4 text-amber-400" />
+            <span>{scannerMode ? 'Scanner Active' : 'Scanner Paused'}</span>
+          </button>
+
+          {products.length < SAMPLE_PC_HARDWARE_CATALOG.length && (
             <button
               type="button"
               onClick={handleSeedCatalog}
@@ -283,10 +405,34 @@ export function PosRegisterPage({
               className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-950/40 cursor-pointer shrink-0"
             >
               <Sparkles className="w-4 h-4" />
-              <span>{seeding ? 'Seeding...' : 'Seed Sample PC Hardware'}</span>
+              <span>
+                {seeding
+                  ? 'Seeding...'
+                  : products.length === 0
+                  ? 'Seed Sample PC Hardware'
+                  : `Seed Missing Hardware (+${SAMPLE_PC_HARDWARE_CATALOG.length - products.length})`}
+              </span>
             </button>
           )}
         </div>
+
+        {/* Live Barcode Scan Feedback Banner */}
+        {scanFeedback && (
+          <div
+            className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+              scanFeedback.type === 'success'
+                ? 'bg-emerald-950/60 border-emerald-700/70 text-emerald-200'
+                : 'bg-amber-950/60 border-amber-700/70 text-amber-200'
+            }`}
+          >
+            {scanFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            )}
+            <span>{scanFeedback.text}</span>
+          </div>
+        )}
 
         {/* Hardware Category Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -328,9 +474,10 @@ export function PosRegisterPage({
                 Welcome to MegaHertz Depot POS
               </h3>
               <p className="text-xs text-stone-400 leading-relaxed">
-                Load our curated 14-item PC Hardware Catalog (Ryzen 7 7800X3D, Core i5-14600K, RTX
-                4070 Super, AM5 & LGA1700 Motherboards, DDR5/DDR4 RAM, NVMe SSD, PSU, Case &
-                Peripherals) to test offline POS checkout and PC Rig building immediately.
+                Load our curated 142-item PC Hardware &amp; Laptop Catalog (Ryzen 7000/9000 &amp; Intel Core
+                14th Gen / Ultra, RTX 40/50 &amp; RX 7000/9000 GPUs, AM5/AM4/LGA1700/LGA1851 Motherboards,
+                DDR5/DDR4 RAM, NVMe SSDs, PSUs, Cases, Cooling, Monitors, Peripherals &amp; Laptops) to test
+                offline POS checkout and PC Rig building immediately.
               </p>
             </div>
             <button
@@ -341,7 +488,7 @@ export function PosRegisterPage({
               className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-lg shadow-amber-950/40 cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Seed Sample PC Hardware Catalog (14 Items)</span>
+              <span>Seed Sample PC Hardware Catalog (142 Items)</span>
             </button>
           </div>
         ) : (

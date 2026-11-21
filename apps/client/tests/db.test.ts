@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach } from 'vitest';
 import Dexie from 'dexie';
+import { SAMPLE_PC_HARDWARE_CATALOG } from '@countwise/shared';
 import { CountwiseDatabase } from '../src/db/index.js';
 import { LocalFirstRepository } from '../src/services/localRepository.js';
 
@@ -146,21 +147,23 @@ describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
     upgradedDb.close();
   });
 
-  it('should seed the 14-item PC hardware catalog and atomically deduct stock on POS sale checkout', async () => {
+  it('should seed the PC hardware catalog and atomically deduct stock on POS sale checkout', async () => {
     const seededCount = await repo.seedSampleHardwareCatalog(storeId, userId);
-    expect(seededCount).toBe(14);
+    expect(seededCount).toBe(SAMPLE_PC_HARDWARE_CATALOG.length);
 
     // Calling seed again when products exist is a no-op
     const secondSeed = await repo.seedSampleHardwareCatalog(storeId, userId);
     expect(secondSeed).toBe(0);
 
     const products = await db.products.where('storeId').equals(storeId).toArray();
-    expect(products).toHaveLength(14);
+    expect(products).toHaveLength(SAMPLE_PC_HARDWARE_CATALOG.length);
 
     const cpu = products.find((p) => p.sku === 'CPU-AMD-7800X3D')!;
     expect(cpu).toBeDefined();
     expect(cpu.category).toBe('CPU');
     expect(cpu.specs?.socket).toBe('AM5');
+    expect(cpu.imageUrl).toBe('/images/products/CPU-AMD-7800X3D.svg');
+    expect(products.filter((p) => p.imageUrl).every((p) => p.imageUrl?.startsWith('/images/products/'))).toBe(true);
 
     const stockBefore = await repo.getProductStockInfo(cpu.id);
     expect(stockBefore.currentStock).toBe(8);

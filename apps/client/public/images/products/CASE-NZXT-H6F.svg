@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#0c0a09"/>
+  <!-- Dual-Chamber Chassis Frame -->
+  <rect x="155" y="75" width="290" height="385" rx="12" fill="#18181b" stroke="#52525b" stroke-width="3"/>
+  <!-- Tempered Glass Window -->
+  <rect x="170" y="92" width="195" height="340" rx="6" fill="#09090b" stroke="#3f3f46" stroke-width="2"/>
+  <!-- Angled Right Intake Mesh with 3 Fans -->
+  <rect x="375" y="92" width="55" height="340" rx="6" fill="#27272a" stroke="#52525b" stroke-width="1.5"/>
+  <circle cx="402" cy="155" r="20" fill="#09090b" stroke="#fbbf24" stroke-width="2"/>
+  <circle cx="402" cy="260" r="20" fill="#09090b" stroke="#fbbf24" stroke-width="2"/>
+  <circle cx="402" cy="365" r="20" fill="#09090b" stroke="#fbbf24" stroke-width="2"/>
+  <!-- Internal Illuminated Rig Silhouette -->
+  <circle cx="265" cy="210" r="34" fill="#18181b" stroke="#a855f7" stroke-width="3"/>
+  <text x="265" y="215" text-anchor="middle" fill="#e9d5ff" font-family="monospace" font-weight="800" font-size="12">NZXT</text>
+  <rect x="195" y="285" width="145" height="38" rx="6" fill="#27272a" stroke="#f59e0b" stroke-width="2"/>
+  <text x="267" y="308" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="800" font-size="11">GEFORCE RTX</text>
+  <!-- Bottom Label -->
+  <rect x="100" y="490" width="400" height="54" rx="14" fill="#1c1917" stroke="#44403c" stroke-width="1.5"/>
+  <text x="300" y="514" text-anchor="middle" fill="#f5f5f4" font-family="sans-serif" font-weight="800" font-size="15">NZXT H6 Flow Dual-Chamber Case</text>
+  <text x="300" y="534" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="700" font-size="12">PANORAMIC GLASS • MID-TOWER ATX • BLACK</text>
+</svg>

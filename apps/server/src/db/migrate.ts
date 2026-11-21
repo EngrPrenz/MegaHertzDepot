@@ -16,8 +16,10 @@ export async function runMigrations() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'staff',
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'staff';
     `);
 
     // Stores
@@ -92,6 +94,33 @@ export async function runMigrations() {
       );
       CREATE INDEX IF NOT EXISTS idx_adjustments_product_id ON adjustments(product_id);
       CREATE INDEX IF NOT EXISTS idx_adjustments_store_id ON adjustments(store_id);
+    `);
+
+    // Sale Orders
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sale_orders (
+        id UUID PRIMARY KEY,
+        store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        receipt_number TEXT NOT NULL,
+        customer_name TEXT,
+        customer_phone TEXT,
+        items JSONB NOT NULL,
+        subtotal DOUBLE PRECISION NOT NULL,
+        discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+        tax_rate DOUBLE PRECISION NOT NULL DEFAULT 12,
+        tax_inclusive BOOLEAN NOT NULL DEFAULT true,
+        tax_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+        total_amount DOUBLE PRECISION NOT NULL,
+        payment_method TEXT NOT NULL,
+        amount_tendered DOUBLE PRECISION NOT NULL,
+        change_due DOUBLE PRECISION NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at BIGINT NOT NULL,
+        hlc TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_sale_orders_store_id ON sale_orders(store_id);
     `);
 
     // Change Log

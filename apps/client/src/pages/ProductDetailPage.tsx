@@ -38,6 +38,15 @@ interface CustomerUser {
   address?: string;
 }
 
+function safeJsonParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 interface ProductDetailPageProps {
   productId: string;
   storeId: string;
@@ -59,16 +68,14 @@ export function ProductDetailPage({
 
   // Customer state
   const [customer, setCustomer] = useState<CustomerUser | null>(() => {
-    const raw = localStorage.getItem('megahertz_customer_user');
-    return raw ? JSON.parse(raw) : null;
+    return safeJsonParse<CustomerUser | null>(localStorage.getItem('megahertz_customer_user'), null);
   });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
   // Cart state
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<StorefrontCartItem[]>(() => {
-    const raw = localStorage.getItem('megahertz_customer_cart');
-    return raw ? JSON.parse(raw) : [];
+    return safeJsonParse<StorefrontCartItem[]>(localStorage.getItem('megahertz_customer_cart'), []);
   });
 
   // Checkout modal
@@ -434,7 +441,7 @@ export function ProductDetailPage({
                     </div>
                   )}
 
-                  {product.specs.wattage && (
+                  {product.specs.wattage ? (
                     <div className="p-3 rounded-xl bg-stone-900/70 border border-stone-800 text-xs">
                       <div className="text-[10px] text-stone-500 flex items-center gap-1">
                         <Zap className="w-3 h-3 text-amber-400" />
@@ -444,7 +451,7 @@ export function ProductDetailPage({
                         {product.specs.wattage} Watts
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}
@@ -552,12 +559,12 @@ export function ProductDetailPage({
               </div>
             )}
 
-            {product.specs?.wattage && (
+            {product.specs?.wattage ? (
               <div className="flex justify-between py-2 border-b border-stone-800/60">
                 <span className="text-stone-400">Thermal / Power Consumption (TDP)</span>
                 <span className="font-mono font-bold text-white">{product.specs.wattage} Watts</span>
               </div>
-            )}
+            ) : null}
 
             <div className="flex justify-between py-2 border-b border-stone-800/60">
               <span className="text-stone-400">Available Gilmore Stock</span>

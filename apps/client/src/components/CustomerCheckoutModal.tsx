@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ModalDialog } from './ModalDialog.js';
 import { localRepository } from '../services/localRepository.js';
-import { SaleOrderLocal, ProductLocal } from '../db/index.js';
+import { localDb, SaleOrderLocal, ProductLocal } from '../db/index.js';
 import { PaymentMethod, formatCurrency } from '@countwise/shared';
 import {
   Truck,
@@ -105,6 +105,73 @@ export function CustomerCheckoutModal({
       ]
         .filter(Boolean)
         .join(' | ');
+
+      // Prefer authoritative server checkout when online so pricing/stock are enforced centrally
+      if (navigator.onLine) {
+        try {
+          const response = await fetch('/public/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              storeId,
+              customerName: customer.name || customer.email.split('@')[0],
+              customerEmail: customer.email?.includes('@') ? customer.email : undefined,
+              customerPhone: phone.trim() || undefined,
+              fulfillment,
+              address: address.trim() || undefined,
+              city: city.trim() || undefined,
+              notes: notes.trim() || undefined,
+              paymentMethod,
+              items: cart.map((item) => ({
+                productId: item.product.id,
+                quantity: item.quantity,
+              })),
+            }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (response.ok && data?.order) {
+            const remote = data.order;
+            const savedOrder: SaleOrderLocal = {
+              id: remote.id,
+              storeId: remote.storeId,
+              receiptNumber: remote.receiptNumber,
+              customerName: remote.customerName ?? undefined,
+              customerPhone: remote.customerPhone ?? undefined,
+              items: remote.items,
+              subtotal: Number(remote.subtotal),
+              discountAmount: Number(remote.discountAmount ?? 0),
+              taxRate: Number(remote.taxRate ?? taxRate),
+              taxInclusive: Boolean(remote.taxInclusive ?? taxInclusive),
+              taxAmount: Number(remote.taxAmount ?? 0),
+              totalAmount: Number(remote.totalAmount),
+              paymentMethod: remote.paymentMethod,
+              amountTendered: Number(remote.amountTendered),
+              changeDue: Number(remote.changeDue ?? 0),
+              notes: remote.notes ?? undefined,
+              createdAt: Number(remote.createdAt),
+              hlc: remote.hlc,
+              deviceId: remote.deviceId,
+              userId: remote.userId,
+              serverSeq: remote.serverSeq,
+            };
+            await localDb.orders.put(savedOrder);
+            setConfirmedOrder(savedOrder);
+            onOrderPlaced(savedOrder);
+            return;
+          }
+          if (response.status >= 400 && response.status < 500) {
+            throw new Error(data?.error || 'Order could not be placed.');
+          }
+        } catch (err: any) {
+          if (
+            err instanceof Error &&
+            err.name !== 'TypeError' &&
+            !err.message?.toLowerCase().includes('failed to fetch')
+          ) {
+            throw err;
+          }
+        }
+      }
 
       const order = await localRepository.createSaleOrder({
         storeId,

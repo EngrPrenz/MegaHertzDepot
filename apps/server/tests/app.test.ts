@@ -331,4 +331,344 @@ describe('API Server & Sync Protocol Integration Tests', () => {
     expect(rejectRes.status).toBe(400);
     expect(rejectRes.body.error).toContain('Only JPEG, PNG, WebP, and GIF');
   });
+
+  it('should isolate customer portal tokens from staff routes and staff login', async () => {
+    const custReg = await request(app).post('/auth/customer/register').send({
+      email: 'shopper@countwise.dev',
+      password: 'password123',
+      name: 'PC Buyer',
+    });
+
+    expect(custReg.status).toBe(201);
+    expect(custReg.body.user.role).toBe('customer');
+    const customerToken = custReg.body.accessToken;
+
+    // Customer accounts must not log in through the staff portal
+    const staffLoginAttempt = await request(app).post('/auth/login').send({
+      email: 'shopper@countwise.dev',
+      password: 'password123',
+    });
+    expect(staffLoginAttempt.status).toBe(401);
+
+    // Customer bearer token must be rejected (403) on staff endpoints
+    const storesRes = await request(app)
+      .get('/stores')
+      .set('Authorization', `Bearer ${customerToken}`);
+    expect(storesRes.status).toBe(403);
+
+    const pullRes = await request(app)
+      .get(`/sync/pull?storeId=${crypto.randomUUID()}&since=0`)
+      .set('Authorization', `Bearer ${customerToken}`);
+    expect(pullRes.status).toBe(403);
+
+    const uploadRes = await request(app)
+      .post('/upload')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .attach('image', Buffer.from('RIFF....WEBPVP8 '), {
+        filename: 'test.webp',
+        contentType: 'image/webp',
+      });
+    expect(uploadRes.status).toBe(403);
+  });
+
+  it('should restrict store member invitations to the store owner and hide unknown emails', async () => {
+    const ownerReg = await request(app).post('/auth/register').send({
+      email: 'store-owner@countwise.dev',
+      password: 'password123',
+      name: 'Flagship Store',
+    });
+    const staffBReg = await request(app).post('/auth/register').send({
+      email: 'cashier-b@countwise.dev',
+      password: 'password123',
+      name: 'Cashier B',
+    });
+
+    const ownerToken = ownerReg.body.accessToken;
+    const staffBToken = staffBReg.body.accessToken;
+    const storeId = ownerReg.body.defaultStoreId;
+
+    // Owner successfully adds existing staff B
+    const addOk = await request(app)
+      .post(`/stores/${storeId}/members`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ email: 'cashier-b@countwise.dev' });
+    expect(addOk.status).toBe(200);
+
+    // Unknown email returns generic non-enumerating error
+    const unknownRes = await request(app)
+      .post(`/stores/${storeId}/members`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ email: 'does-not-exist@countwise.dev' });
+    expect(unknownRes.status).toBe(400);
+    expect(unknownRes.body.error).toBe('Unable to add member for that email address');
+
+    // Non-owner member B cannot invite additional staff
+    const nonOwnerAttempt = await request(app)
+      .post(`/stores/${storeId}/members`)
+      .set('Authorization', `Bearer ${staffBToken}`)
+      .send({ email: 'another@countwise.dev' });
+    expect(nonOwnerAttempt.status).toBe(403);
+  });
+
+  it('POST /upload should reject spoofed image MIME types whose magic bytes do not match', async () => {
+    const reg = await request(app).post('/auth/register').send({
+      email: 'magiccheck@countwise.dev',
+      password: 'password123',
+      name: 'Magic Check Store',
+    });
+    const token = reg.body.accessToken;
+
+    const spoofedRes = await request(app)
+      .post('/upload')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('image', Buffer.from('not a real png payload'), {
+        filename: 'evil.png',
+        contentType: 'image/png',
+      });
+
+    expect(spoofedRes.status).toBe(400);
+  });
+
+  it('POST /sync/push should reject malformed HLC strings', async () => {
+    const reg = await request(app).post('/auth/register').send({
+      email: 'hlcvalidator@countwise.dev',
+      password: 'password123',
+      name: 'HLC Store',
+    });
+    const token = reg.body.accessToken;
+    const storeId = reg.body.defaultStoreId;
+
+    const pushRes = await request(app)
+      .post('/sync/push')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        deviceId: 'dev-bad',
+        mutations: [
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'product.create',
+            hlc: 'not-a-valid-hlc',
+            createdAt: Date.now(),
+            payload: {
+              id: crypto.randomUUID(),
+              storeId,
+              name: 'Bad HLC Item',
+              price: 100,
+              nameHlc: 'not-a-valid-hlc',
+            },
+          },
+        ],
+      });
+
+    expect(pushRes.status).toBe(400);
+  });
+
+  it('should sync order.update mutations so voided receipts propagate to other terminals', async () => {
+    const reg = await request(app).post('/auth/register').send({
+      email: 'voidsync@countwise.dev',
+      password: 'password123',
+      name: 'Void Sync Store',
+    });
+    const token = reg.body.accessToken;
+    const storeId = reg.body.defaultStoreId;
+    const productId = crypto.randomUUID();
+    const orderId = crypto.randomUUID();
+
+    const createRes = await request(app)
+      .post('/sync/push')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        deviceId: 'pos-1',
+        mutations: [
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'product.create',
+            hlc: '001700000001000:000000:pos-1',
+            createdAt: 1700000001000,
+            payload: {
+              id: productId,
+              storeId,
+              name: 'RTX 4070 Super',
+              price: 38000,
+              nameHlc: '001700000001000:000000:pos-1',
+            },
+          },
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'order.create',
+            hlc: '001700000002000:000000:pos-1',
+            createdAt: 1700000002000,
+            payload: {
+              id: orderId,
+              storeId,
+              receiptNumber: 'MHD-261121-1001',
+              items: [
+                {
+                  productId,
+                  productName: 'RTX 4070 Super',
+                  quantity: 1,
+                  unitPrice: 38000,
+                },
+              ],
+              subtotal: 38000,
+              discountAmount: 0,
+              taxRate: 12,
+              taxInclusive: true,
+              taxAmount: 4071.43,
+              totalAmount: 38000,
+              paymentMethod: 'Cash',
+              amountTendered: 38000,
+              changeDue: 0,
+              notes: 'Walk-in sale',
+              createdAt: 1700000002000,
+              hlc: '001700000002000:000000:pos-1',
+              deviceId: 'pos-1',
+            },
+          },
+        ],
+      });
+
+    expect(createRes.status).toBe(200);
+    expect(createRes.body.results.every((r: any) => r.status === 'applied')).toBe(true);
+
+    const updateMutationId = crypto.randomUUID();
+    const updateRes = await request(app)
+      .post('/sync/push')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        deviceId: 'pos-1',
+        mutations: [
+          {
+            mutationId: updateMutationId,
+            storeId,
+            type: 'order.update',
+            hlc: '001700000003000:000000:pos-1',
+            createdAt: 1700000003000,
+            payload: {
+              id: orderId,
+              storeId,
+              notes: 'Walk-in sale | [VOIDED] Customer changed mind',
+              hlc: '001700000003000:000000:pos-1',
+            },
+          },
+        ],
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.results).toEqual([
+      { mutationId: updateMutationId, status: 'applied' },
+    ]);
+
+    const pullRes = await request(app)
+      .get(`/sync/pull?storeId=${storeId}&since=0&limit=10`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(pullRes.status).toBe(200);
+    const orderChanges = pullRes.body.changes.filter(
+      (c: any) => c.entityType === 'order' && c.entityId === orderId
+    );
+    const latestOrderChange = orderChanges[orderChanges.length - 1];
+    expect(latestOrderChange).toBeDefined();
+    expect(latestOrderChange.payload.notes).toContain('[VOIDED]');
+  });
+
+  it('should serve GET /public/catalog without costPrice and compute authoritative totals on POST /public/orders', async () => {
+    const reg = await request(app).post('/auth/register').send({
+      email: 'storefront-owner@countwise.dev',
+      password: 'password123',
+      name: 'Public Storefront Depot',
+    });
+    const token = reg.body.accessToken;
+    const storeId = reg.body.defaultStoreId;
+    const productId = crypto.randomUUID();
+
+    const seedRes = await request(app)
+      .post('/sync/push')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        deviceId: 'admin-1',
+        mutations: [
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'product.create',
+            hlc: '001700000001000:000000:admin-1',
+            createdAt: 1700000001000,
+            payload: {
+              id: productId,
+              storeId,
+              name: 'Ryzen 5 7600',
+              category: 'CPU',
+              price: 15000,
+              costPrice: 11000,
+              nameHlc: '001700000001000:000000:admin-1',
+              priceHlc: '001700000001000:000000:admin-1',
+            },
+          },
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'adjustment.create',
+            hlc: '001700000001001:000000:admin-1',
+            createdAt: 1700000001001,
+            payload: {
+              id: crypto.randomUUID(),
+              productId,
+              storeId,
+              delta: 5,
+              reason: 'restock',
+              createdAt: 1700000001001,
+              hlc: '001700000001001:000000:admin-1',
+              deviceId: 'admin-1',
+            },
+          },
+        ],
+      });
+
+    expect(seedRes.status).toBe(200);
+
+    const baselinePull = await request(app)
+      .get(`/sync/pull?storeId=${storeId}&since=0&limit=10`)
+      .set('Authorization', `Bearer ${token}`);
+    const sinceSeq = baselinePull.body.nextSeq;
+
+    // 1. Public catalog must omit wholesale costPrice and report live stock
+    const catalogRes = await request(app).get(`/public/catalog?storeId=${storeId}`);
+    expect(catalogRes.status).toBe(200);
+    expect(catalogRes.body.products).toHaveLength(1);
+    expect(catalogRes.body.products[0]).not.toHaveProperty('costPrice');
+    expect(catalogRes.body.products[0].price).toBe(15000);
+    expect(catalogRes.body.products[0].stock).toBe(5);
+
+    // 2. Public order computes authoritative prices & delivery fee server-side and logs sync changes
+    const orderRes = await request(app).post('/public/orders').send({
+      storeId,
+      customerName: 'Juan Dela Cruz',
+      customerPhone: '09171234567',
+      fulfillment: 'delivery',
+      address: '123 Katipunan Ave',
+      city: 'Quezon City',
+      paymentMethod: 'Cash',
+      items: [{ productId, quantity: 2 }],
+    });
+
+    expect(orderRes.status).toBe(201);
+    expect(orderRes.body.order.subtotal).toBe(30000);
+    expect(orderRes.body.order.totalAmount).toBe(30150);
+
+    const postOrderPull = await request(app)
+      .get(`/sync/pull?storeId=${storeId}&since=${sinceSeq}&limit=10`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(postOrderPull.status).toBe(200);
+    const pulledOrder = postOrderPull.body.changes.find((c: any) => c.entityType === 'order');
+    const pulledAdj = postOrderPull.body.changes.find((c: any) => c.entityType === 'adjustment');
+    expect(pulledOrder).toBeDefined();
+    expect(pulledOrder.payload.totalAmount).toBe(30150);
+    expect(pulledAdj).toBeDefined();
+    expect(pulledAdj.payload.delta).toBe(-2);
+  });
 });

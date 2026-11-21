@@ -8,7 +8,8 @@ export type HardwareCategory =
   | 'Case'
   | 'Cooling'
   | 'Monitor'
-  | 'Peripheral';
+  | 'Peripheral'
+  | 'Laptop';
 
 export type PaymentMethod = 'Cash' | 'GCash' | 'Maya' | 'Card' | 'Split';
 
@@ -23,6 +24,7 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  role?: 'staff' | 'customer';
   createdAt: string;
 }
 

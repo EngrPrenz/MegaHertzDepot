@@ -17,8 +17,10 @@ import {
 interface SyncStatusPageProps {
   storeId: string;
   isOnline: boolean;
+  isDemoMode?: boolean;
   status: SyncStatusSnapshot;
   onManualSync: () => Promise<void>;
+  onExitDemoMode?: () => void;
 }
 
 export function SyncStatusPage({

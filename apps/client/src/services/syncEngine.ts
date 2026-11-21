@@ -5,6 +5,7 @@ import {
   SyncPullResponse,
   HybridLogicalClock,
   computeBackoffDelay,
+  getDefaultCatalogImageUrl,
 } from '@countwise/shared';
 import {
   CountwiseDatabase,
@@ -12,8 +13,20 @@ import {
   ProductLocal,
   AdjustmentLocal,
   SaleOrderLocal,
+  OutboxMutation,
 } from '../db/index.js';
 import { LocalFirstRepository, localRepository } from './localRepository.js';
+
+function generateMutationUuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export interface SyncTransport {
   push(request: SyncPushRequest): Promise<SyncPushResponse>;
@@ -263,16 +276,82 @@ export class SyncEngine {
     while (true) {
       const allOutbox = await this.db.outbox.orderBy('createdAt').toArray();
       const pending = allOutbox.filter(
-        (m) =>
-          (m.status === undefined || m.status === 'pending') &&
-          (!storeId || m.storeId === storeId)
+        (m) => m.status === undefined || m.status === 'pending'
       );
 
       if (pending.length === 0) {
         break;
       }
 
-      const batch = pending.slice(0, this.batchSize);
+      // Normalize any orphaned storeIds (e.g. from demo mode or a store switch) to the active storeId
+      const rawSlice = pending.slice(0, this.batchSize);
+      const batch: OutboxMutation[] = [];
+      for (const m of rawSlice) {
+        let normalized = m;
+        if (storeId && m.storeId !== storeId) {
+          const updatedPayload =
+            m.payload && typeof m.payload === 'object'
+              ? { ...m.payload, storeId }
+              : m.payload;
+          normalized = {
+            ...m,
+            storeId,
+            payload: updatedPayload,
+          };
+        }
+
+        // If pushing an adjustment, update, or delete, ensure the local product exists on server first
+        const targetProductId =
+          normalized.type === 'adjustment.create'
+            ? normalized.payload?.productId
+            : normalized.type === 'product.update' || normalized.type === 'product.delete'
+            ? normalized.payload?.id
+            : undefined;
+
+        if (targetProductId) {
+          const alreadyInBatch = batch.some(
+            (b) => b.type === 'product.create' && b.payload?.id === targetProductId
+          );
+          if (!alreadyInBatch) {
+            const localProd = await this.db.products.get(targetProductId);
+            if (localProd) {
+              batch.push({
+                mutationId: generateMutationUuid(),
+                storeId: normalized.storeId,
+                type: 'product.create' as const,
+                hlc: localProd.nameHlc,
+                createdAt: normalized.createdAt - 1,
+                attempts: 0,
+                payload: {
+                  id: localProd.id,
+                  storeId: normalized.storeId,
+                  name: localProd.name,
+                  sku: localProd.sku ?? undefined,
+                  category: localProd.category,
+                  brand: localProd.brand ?? null,
+                  price:
+                    typeof localProd.price === 'number' && !Number.isNaN(localProd.price)
+                      ? localProd.price
+                      : 0,
+                  costPrice: localProd.costPrice ?? null,
+                  warranty: localProd.warranty ?? null,
+                  specs: localProd.specs ?? null,
+                  imageUrl:
+                    localProd.imageUrl && localProd.imageUrl.length <= 2000
+                      ? localProd.imageUrl
+                      : null,
+                  nameHlc: localProd.nameHlc,
+                  skuHlc: localProd.skuHlc || localProd.nameHlc,
+                  priceHlc: localProd.priceHlc || localProd.nameHlc,
+                  imageHlc: localProd.imageHlc || localProd.nameHlc,
+                },
+              });
+            }
+          }
+        }
+
+        batch.push(normalized);
+      }
 
       try {
         const response = await this.transport.push({
@@ -347,6 +426,9 @@ export class SyncEngine {
           if (p?.priceHlc) {
             await this.repo.receiveRemoteHlc(p.priceHlc);
           }
+          if (p?.imageHlc) {
+            await this.repo.receiveRemoteHlc(p.imageHlc);
+          }
           if (p?.deletedHlc) {
             await this.repo.receiveRemoteHlc(p.deletedHlc);
           }
@@ -366,9 +448,16 @@ export class SyncEngine {
             for (const change of response.changes) {
               if (change.entityType === 'product') {
                 const remote = change.payload;
+                const existingLocal = await this.db.products.get(remote.id);
                 const remoteDeletedAtMs = remote.deletedAt
                   ? new Date(remote.deletedAt).getTime()
                   : undefined;
+
+                const resolvedImageUrl =
+                  remote.imageUrl ??
+                  existingLocal?.imageUrl ??
+                  getDefaultCatalogImageUrl(remote.sku, remote.name) ??
+                  undefined;
 
                 const serverLocalState: ProductLocal = {
                   id: remote.id,
@@ -381,9 +470,11 @@ export class SyncEngine {
                   costPrice: remote.costPrice ?? undefined,
                   warranty: remote.warranty ?? undefined,
                   specs: remote.specs ?? undefined,
+                  imageUrl: resolvedImageUrl,
                   nameHlc: remote.nameHlc,
                   skuHlc: remote.skuHlc ?? remote.nameHlc,
                   priceHlc: remote.priceHlc ?? remote.nameHlc,
+                  imageHlc: remote.imageHlc ?? existingLocal?.imageHlc ?? remote.nameHlc,
                   deletedAt: remoteDeletedAtMs,
                   deletedHlc: remote.deletedHlc ?? undefined,
                   serverSeq: change.seq,
@@ -450,9 +541,14 @@ export class SyncEngine {
                     costPrice: pending.payload.costPrice ?? undefined,
                     warranty: pending.payload.warranty ?? undefined,
                     specs: pending.payload.specs ?? undefined,
+                    imageUrl:
+                      pending.payload.imageUrl ??
+                      getDefaultCatalogImageUrl(pending.payload.sku, pending.payload.name) ??
+                      undefined,
                     nameHlc: pending.payload.nameHlc,
                     skuHlc: pending.payload.skuHlc ?? pending.payload.nameHlc,
                     priceHlc: pending.payload.priceHlc ?? pending.payload.nameHlc,
+                    imageHlc: pending.payload.imageHlc ?? pending.payload.nameHlc,
                   });
                 }
               } else if (pending.type === 'product.update') {
@@ -497,6 +593,17 @@ export class SyncEngine {
                       updated.costPrice = pending.payload.costPrice ?? undefined;
                     updated.priceHlc = pending.payload.priceHlc;
                   }
+                  if (
+                    pending.payload.imageUrl !== undefined &&
+                    pending.payload.imageHlc &&
+                    HybridLogicalClock.compare(
+                      pending.payload.imageHlc,
+                      updated.imageHlc ?? updated.nameHlc
+                    ) >= 0
+                  ) {
+                    updated.imageUrl = pending.payload.imageUrl ?? undefined;
+                    updated.imageHlc = pending.payload.imageHlc;
+                  }
                   await this.db.products.put(updated);
                 }
               } else if (pending.type === 'product.delete') {
@@ -506,6 +613,22 @@ export class SyncEngine {
                     ...prod,
                     deletedAt: pending.payload.deletedAt,
                     deletedHlc: pending.payload.deletedHlc,
+                  });
+                }
+              } else if (pending.type === 'order.update') {
+                const ord = await this.db.orders.get(pending.payload.id);
+                if (
+                  ord &&
+                  (!ord.hlc || HybridLogicalClock.compare(pending.payload.hlc, ord.hlc) >= 0)
+                ) {
+                  await this.db.orders.put({
+                    ...ord,
+                    items: pending.payload.items ?? ord.items,
+                    notes:
+                      pending.payload.notes !== undefined
+                        ? (pending.payload.notes ?? undefined)
+                        : ord.notes,
+                    hlc: pending.payload.hlc,
                   });
                 }
               }

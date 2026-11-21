@@ -37,16 +37,18 @@ export function useSyncEngine(storeId: string | null) {
       return;
     }
 
-    // Attempt Background Sync registration where supported (Stretch goal + Section 8)
+    // Attempt Background Sync registration non-blockingly only if an active SW is already registered
     if ('serviceWorker' in navigator && 'SyncManager' in window) {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        if ('sync' in reg) {
-          await (reg as any).sync.register('countwise-outbox-sync');
-        }
-      } catch {
-        // Fallback to foreground sync
-      }
+      navigator.serviceWorker
+        .getRegistration()
+        .then((reg) => {
+          if (reg?.active && 'sync' in reg) {
+            return (reg as any).sync.register('countwise-outbox-sync');
+          }
+        })
+        .catch(() => {
+          // Fallback to foreground sync
+        });
     }
 
     try {

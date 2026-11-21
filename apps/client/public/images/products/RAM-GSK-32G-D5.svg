@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <defs>
+    <linearGradient id="rgb" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="35%" stop-color="#ec4899"/>
+      <stop offset="70%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="hs" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#27272a"/>
+      <stop offset="50%" stop-color="#18181b"/>
+      <stop offset="100%" stop-color="#09090b"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="600" fill="#0c0a09"/>
+  <!-- Module 1 (Back) -->
+  <g transform="translate(20, -45)">
+    <rect x="90" y="190" width="400" height="18" rx="4" fill="url(#rgb)"/>
+    <path d="M85,205 H495 L485,305 H95 Z" fill="url(#hs)" stroke="#52525b" stroke-width="2"/>
+    <rect x="105" y="305" width="180" height="14" rx="2" fill="#fbbf24"/>
+    <rect x="300" y="305" width="175" height="14" rx="2" fill="#fbbf24"/>
+    <text x="290" y="262" text-anchor="middle" fill="#e4e4e7" font-family="sans-serif" font-weight="900" font-size="18" letter-spacing="3">TRIDENT Z5 RGB</text>
+  </g>
+  <!-- Module 2 (Front) -->
+  <g transform="translate(0, 75)">
+    <rect x="90" y="190" width="400" height="18" rx="4" fill="url(#rgb)"/>
+    <path d="M85,205 H495 L485,305 H95 Z" fill="url(#hs)" stroke="#a1a1aa" stroke-width="2"/>
+    <path d="M110,235 L470,235 L460,255 L120,255 Z" fill="#3f3f46"/>
+    <rect x="105" y="305" width="180" height="14" rx="2" fill="#fbbf24"/>
+    <rect x="300" y="305" width="175" height="14" rx="2" fill="#fbbf24"/>
+    <text x="290" y="250" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-weight="900" font-size="18" letter-spacing="3">G.SKILL TRIDENT Z5</text>
+    <text x="290" y="285" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="700" font-size="13">DDR5-6000 CL30 • 32GB (2x16GB)</text>
+  </g>
+  <!-- Bottom Label -->
+  <rect x="100" y="490" width="400" height="54" rx="14" fill="#1c1917" stroke="#44403c" stroke-width="1.5"/>
+  <text x="300" y="514" text-anchor="middle" fill="#f5f5f4" font-family="sans-serif" font-weight="800" font-size="15">G.Skill Trident Z5 RGB 32GB</text>
+  <text x="300" y="534" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="700" font-size="12">2x16GB DDR5-6000 • CL30 • EXPO/XMP</text>
+</svg>

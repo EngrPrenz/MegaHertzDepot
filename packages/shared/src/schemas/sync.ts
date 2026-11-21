@@ -11,6 +11,7 @@ export const hardwareCategorySchema = z.enum([
   'Cooling',
   'Monitor',
   'Peripheral',
+  'Laptop',
 ]);
 
 export const paymentMethodSchema = z.enum(['Cash', 'GCash', 'Maya', 'Card', 'Split']);
@@ -27,6 +28,11 @@ export const hardwareSpecsSchema = z
 
 export const adjustmentReasonSchema = z.enum(['count', 'sale', 'restock', 'damage', 'other']);
 
+export const hlcStringSchema = z
+  .string()
+  .regex(/^\d{1,15}:\d{1,6}:.+$/, 'Invalid HLC format')
+  .max(120);
+
 export const productCreatePayloadSchema = z.object({
   id: z.string().uuid(),
   storeId: z.string().uuid(),
@@ -39,10 +45,10 @@ export const productCreatePayloadSchema = z.object({
   warranty: z.string().max(120).optional().nullable(),
   specs: hardwareSpecsSchema,
   imageUrl: z.string().max(2000).optional().nullable(),
-  nameHlc: z.string(),
-  skuHlc: z.string().optional(),
-  priceHlc: z.string().optional(),
-  imageHlc: z.string().optional(),
+  nameHlc: hlcStringSchema,
+  skuHlc: hlcStringSchema.optional(),
+  priceHlc: hlcStringSchema.optional(),
+  imageHlc: hlcStringSchema.optional(),
 });
 
 export const productUpdatePayloadSchema = z.object({
@@ -57,17 +63,17 @@ export const productUpdatePayloadSchema = z.object({
   warranty: z.string().max(120).optional().nullable(),
   specs: hardwareSpecsSchema,
   imageUrl: z.string().max(2000).optional().nullable(),
-  nameHlc: z.string().optional(),
-  skuHlc: z.string().optional(),
-  priceHlc: z.string().optional(),
-  imageHlc: z.string().optional(),
+  nameHlc: hlcStringSchema.optional(),
+  skuHlc: hlcStringSchema.optional(),
+  priceHlc: hlcStringSchema.optional(),
+  imageHlc: hlcStringSchema.optional(),
 });
 
 export const productDeletePayloadSchema = z.object({
   id: z.string().uuid(),
   storeId: z.string().uuid(),
   deletedAt: z.number(),
-  deletedHlc: z.string(),
+  deletedHlc: hlcStringSchema,
 });
 
 export const adjustmentCreatePayloadSchema = z.object({
@@ -79,7 +85,7 @@ export const adjustmentCreatePayloadSchema = z.object({
   countedPhysical: z.number().int().optional(),
   localStockAtCount: z.number().int().optional(),
   createdAt: z.number(),
-  hlc: z.string(),
+  hlc: hlcStringSchema,
   deviceId: z.string(),
 });
 
@@ -110,10 +116,18 @@ export const orderCreatePayloadSchema = z.object({
   paymentMethod: paymentMethodSchema,
   amountTendered: z.number().min(0),
   changeDue: z.number().min(0),
-  notes: z.string().max(500).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
   createdAt: z.number(),
-  hlc: z.string(),
+  hlc: hlcStringSchema,
   deviceId: z.string(),
+});
+
+export const orderUpdatePayloadSchema = z.object({
+  id: z.string().uuid(),
+  storeId: z.string().uuid(),
+  items: z.array(saleOrderItemSchema).min(1).optional(),
+  notes: z.string().max(2000).optional().nullable(),
+  hlc: hlcStringSchema,
 });
 
 export const mutationTypeSchema = z.enum([
@@ -122,6 +136,7 @@ export const mutationTypeSchema = z.enum([
   'product.delete',
   'adjustment.create',
   'order.create',
+  'order.update',
 ]);
 
 export const mutationItemSchema = z.object({
@@ -129,7 +144,7 @@ export const mutationItemSchema = z.object({
   storeId: z.string().uuid(),
   type: mutationTypeSchema,
   payload: z.record(z.any()),
-  hlc: z.string(),
+  hlc: hlcStringSchema,
   createdAt: z.number(),
 });
 
@@ -178,6 +193,7 @@ export type ProductUpdatePayload = z.infer<typeof productUpdatePayloadSchema>;
 export type ProductDeletePayload = z.infer<typeof productDeletePayloadSchema>;
 export type AdjustmentCreatePayload = z.infer<typeof adjustmentCreatePayloadSchema>;
 export type OrderCreatePayload = z.infer<typeof orderCreatePayloadSchema>;
+export type OrderUpdatePayload = z.infer<typeof orderUpdatePayloadSchema>;
 export type MutationType = z.infer<typeof mutationTypeSchema>;
 export type MutationItem = z.infer<typeof mutationItemSchema>;
 export type SyncPushRequest = z.infer<typeof syncPushRequestSchema>;

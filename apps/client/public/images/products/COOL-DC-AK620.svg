@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#0c0a09"/>
+  <!-- Copper Heatpipes & Coldplate -->
+  <rect x="245" y="410" width="110" height="24" rx="4" fill="#d97706"/>
+  <g stroke="#f59e0b" stroke-width="6" fill="none">
+    <path d="M260,410 V130"/><path d="M280,410 V130"/><path d="M300,410 V130"/>
+    <path d="M320,410 V130"/><path d="M340,410 V130"/>
+  </g>
+  <!-- Dual Fin Towers -->
+  <rect x="145" y="110" width="125" height="275" rx="8" fill="#27272a" stroke="#52525b" stroke-width="2.5"/>
+  <rect x="330" y="110" width="125" height="275" rx="8" fill="#27272a" stroke="#52525b" stroke-width="2.5"/>
+  <!-- 120mm Front/Center Fan -->
+  <rect x="235" y="125" width="130" height="245" rx="10" fill="#18181b" stroke="#06b6d4" stroke-width="2.5"/>
+  <circle cx="300" cy="247" r="54" fill="#09090b" stroke="#3f3f46" stroke-width="2"/>
+  <circle cx="300" cy="247" r="20" fill="#06b6d4"/>
+  <text x="207" y="140" text-anchor="middle" fill="#06b6d4" font-family="monospace" font-weight="900" font-size="13">DC</text>
+  <text x="392" y="140" text-anchor="middle" fill="#06b6d4" font-family="monospace" font-weight="900" font-size="13">AK620</text>
+  <!-- Bottom Label -->
+  <rect x="100" y="490" width="400" height="54" rx="14" fill="#1c1917" stroke="#44403c" stroke-width="1.5"/>
+  <text x="300" y="514" text-anchor="middle" fill="#f5f5f4" font-family="sans-serif" font-weight="800" font-size="15">DeepCool AK620 Dual-Tower Cooler</text>
+  <text x="300" y="534" text-anchor="middle" fill="#22d3ee" font-family="monospace" font-weight="700" font-size="12">6 HEATPIPES • 260W TDP • DUAL 120MM PWM</text>
+</svg>

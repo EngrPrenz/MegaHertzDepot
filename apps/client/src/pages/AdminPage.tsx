@@ -349,10 +349,25 @@ export function AdminPage({
   const handleSeedCatalog = async () => {
     setSeeding(true);
     try {
+      const existingProducts = await localDb.products
+        .where('storeId')
+        .equals(storeId)
+        .filter((p) => !p.deletedAt)
+        .toArray();
+      const existingSkus = new Set(
+        existingProducts.map((p) => p.sku?.trim().toUpperCase()).filter(Boolean)
+      );
+      const existingNames = new Set(
+        existingProducts.map((p) => p.name.trim().toLowerCase()).filter(Boolean)
+      );
+
       let count = 0;
       for (const item of SAMPLE_PC_HARDWARE_CATALOG) {
-        const exists = await localDb.products.get(item.id);
-        if (!exists) {
+        const existsById = await localDb.products.get(item.id);
+        const existsBySkuOrName =
+          existingSkus.has(item.sku.trim().toUpperCase()) ||
+          existingNames.has(item.name.trim().toLowerCase());
+        if (!existsById && !existsBySkuOrName) {
           await localRepository.createProduct({
             id: item.id,
             storeId,
@@ -364,10 +379,17 @@ export function AdminPage({
             costPrice: item.costPrice,
             warranty: item.warranty,
             specs: item.specs,
+            imageUrl: item.imageUrl,
             initialStock: item.initialStock,
             userId,
           });
           count++;
+        } else if (existsById && !existsById.imageUrl && item.imageUrl) {
+          await localRepository.updateProduct({
+            id: existsById.id,
+            storeId,
+            imageUrl: item.imageUrl,
+          });
         }
       }
       showToast(`Seeded ${count} hardware items to catalog!`);
@@ -446,14 +468,14 @@ export function AdminPage({
         </div>
 
         <div className="flex items-center gap-3">
-          {products.length === 0 && (
+          {products.length < SAMPLE_PC_HARDWARE_CATALOG.length && (
             <button
               onClick={handleSeedCatalog}
               disabled={seeding}
               className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 transition cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${seeding ? 'animate-spin' : ''}`} />
-              Seed Hardware Catalog
+              {products.length === 0 ? 'Seed Hardware Catalog' : 'Seed Missing Catalog Items'}
             </button>
           )}
 
@@ -702,11 +724,11 @@ export function AdminPage({
                             {product.specs.socket}
                           </span>
                         )}
-                        {product.specs?.wattage && (
+                        {product.specs?.wattage ? (
                           <span className="px-1.5 py-0.2 bg-stone-800 rounded font-mono text-[10px] text-stone-300 border border-stone-700/60">
                             {product.specs.wattage}W
                           </span>
-                        )}
+                        ) : null}
                         {product.specs?.ramType && (
                           <span className="px-1.5 py-0.2 bg-stone-800 rounded font-mono text-[10px] text-amber-400 border border-stone-700/60">
                             {product.specs.ramType}
@@ -840,11 +862,11 @@ export function AdminPage({
                           {product.specs.socket}
                         </span>
                       )}
-                      {product.specs.wattage && (
+                      {product.specs.wattage ? (
                         <span className="px-1.5 py-0.5 rounded bg-stone-800 text-stone-300 text-[10px] font-mono border border-stone-700/60">
                           {product.specs.wattage}W
                         </span>
-                      )}
+                      ) : null}
                       {product.specs.ramType && (
                         <span className="px-1.5 py-0.5 rounded bg-stone-800 text-amber-400 text-[10px] font-mono border border-stone-700/60">
                           {product.specs.ramType}
@@ -942,8 +964,22 @@ export function AdminPage({
                     </button>
                   )}
                 </div>
+                <select
+                  value={addImageUrl.startsWith('/images/products/') ? addImageUrl : ''}
+                  onChange={(e) => {
+                    if (e.target.value) setAddImageUrl(e.target.value);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-stone-900 border border-stone-800 rounded-lg text-xs text-stone-300 focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">Or choose a built-in local hardware preset image...</option>
+                  {SAMPLE_PC_HARDWARE_CATALOG.filter((item) => item.imageUrl).map((item) => (
+                    <option key={item.sku} value={item.imageUrl}>
+                      [{item.category}] {item.name}
+                    </option>
+                  ))}
+                </select>
                 <p className="text-[11px] text-stone-500">
-                  Compressed automatically in-browser (max 800px WebP) to save disk space.
+                  Stored 100% locally in IndexedDB (WebP) or local static assets — uses 0 cloud bucket quota.
                 </p>
               </div>
             </div>
@@ -1163,8 +1199,22 @@ export function AdminPage({
                     </button>
                   )}
                 </div>
+                <select
+                  value={editImageUrl.startsWith('/images/products/') ? editImageUrl : ''}
+                  onChange={(e) => {
+                    if (e.target.value) setEditImageUrl(e.target.value);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-stone-900 border border-stone-800 rounded-lg text-xs text-stone-300 focus:outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">Or choose a built-in local hardware preset image...</option>
+                  {SAMPLE_PC_HARDWARE_CATALOG.filter((item) => item.imageUrl).map((item) => (
+                    <option key={item.sku} value={item.imageUrl}>
+                      [{item.category}] {item.name}
+                    </option>
+                  ))}
+                </select>
                 <p className="text-[11px] text-stone-500">
-                  Compressed automatically in-browser (max 800px WebP) to save disk space.
+                  Stored 100% locally in IndexedDB (WebP) or local static assets — uses 0 cloud bucket quota.
                 </p>
               </div>
             </div>

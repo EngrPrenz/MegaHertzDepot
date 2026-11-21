@@ -33,10 +33,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg,woff2}'],
         navigateFallback: '/index.html',
         // Exclude sync & auth API routes from service worker caching
-        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/sync/, /^\/upload$/],
+        navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/sync/, /^\/public/, /^\/upload$/],
         runtimeCaching: [
           {
             urlPattern: /^\/uploads\/.*/,
@@ -59,6 +59,7 @@ export default defineConfig({
       '/auth': 'http://localhost:4000',
       '/stores': 'http://localhost:4000',
       '/sync': 'http://localhost:4000',
+      '/public': 'http://localhost:4000',
       '/upload': 'http://localhost:4000',
       '/uploads': 'http://localhost:4000',
       '/health': 'http://localhost:4000',

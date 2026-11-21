@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0c0a09"/>
+    </radialGradient>
+    <linearGradient id="ihs" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="55%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg)"/>
+  <circle cx="300" cy="275" r="210" fill="#38bdf8" opacity="0.06"/>
+  <!-- LGA1700 Rectangular Substrate -->
+  <rect x="155" y="100" width="290" height="360" rx="14" fill="#0f766e" stroke="#2dd4bf" stroke-width="2.5" stroke-opacity="0.4"/>
+  <!-- LGA1700 Elongated IHS -->
+  <path d="M185,125 H415 V225 H428 V335 H415 V435 H185 V335 H172 V225 H185 Z" fill="url(#ihs)" stroke="#f1f5f9" stroke-width="2.5"/>
+  <rect x="202" y="150" width="196" height="260" rx="8" fill="#0f172a" opacity="0.14"/>
+  <polygon points="165,448 182,448 165,431" fill="#fbbf24"/>
+  <!-- Intel Branding -->
+  <text x="300" y="235" text-anchor="middle" fill="#0f172a" font-family="sans-serif" font-weight="900" font-size="26" letter-spacing="1.5">INTEL CORE</text>
+  <rect x="225" y="252" width="150" height="30" rx="6" fill="#0284c7"/>
+  <text x="300" y="272" text-anchor="middle" fill="#ffffff" font-family="monospace" font-weight="900" font-size="16" letter-spacing="1.5">i5-14600K</text>
+  <text x="300" y="312" text-anchor="middle" fill="#1e293b" font-family="monospace" font-weight="700" font-size="13">14TH GEN • UNLOCKED</text>
+  <text x="300" y="335" text-anchor="middle" fill="#334155" font-family="monospace" font-size="11">14 CORES (6P+8E) • LGA1700</text>
+  <!-- Bottom Label -->
+  <rect x="120" y="490" width="360" height="54" rx="14" fill="#1c1917" stroke="#44403c" stroke-width="1.5"/>
+  <text x="300" y="514" text-anchor="middle" fill="#f5f5f4" font-family="sans-serif" font-weight="800" font-size="15">Intel Core i5-14600K</text>
+  <text x="300" y="534" text-anchor="middle" fill="#38bdf8" font-family="monospace" font-weight="700" font-size="12">LGA1700 • 5.3 GHz BOOST • 181W</text>
+</svg>

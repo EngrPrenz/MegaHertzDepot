@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#0c0a09"/>
+  <circle cx="300" cy="265" r="200" fill="#f59e0b" opacity="0.05"/>
+  <!-- Superlight Symmetrical Mouse Shell -->
+  <path d="M220,165 C220,100 380,100 380,165 L392,330 C392,415 350,445 300,445 C250,445 208,415 208,330 Z" fill="#18181b" stroke="#71717a" stroke-width="3"/>
+  <!-- Split Triggers & Scroll Wheel -->
+  <line x1="300" y1="115" x2="300" y2="235" stroke="#3f3f46" stroke-width="2.5"/>
+  <path d="M216,235 Q300,248 384,235" fill="none" stroke="#3f3f46" stroke-width="2"/>
+  <rect x="288" y="145" width="24" height="56" rx="12" fill="#f59e0b" stroke="#ffffff" stroke-width="2"/>
+  <!-- Side Thumb Buttons -->
+  <rect x="202" y="235" width="7" height="32" rx="3" fill="#a1a1aa"/>
+  <rect x="202" y="275" width="7" height="28" rx="3" fill="#a1a1aa"/>
+  <!-- G Logo -->
+  <circle cx="300" cy="365" r="24" fill="none" stroke="#f59e0b" stroke-width="4"/>
+  <text x="300" y="373" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-weight="900" font-size="22">G</text>
+  <text x="300" y="415" text-anchor="middle" fill="#a1a1aa" font-family="monospace" font-weight="700" font-size="11">SUPERLIGHT 2 • 60g</text>
+  <!-- Bottom Label -->
+  <rect x="90" y="490" width="420" height="54" rx="14" fill="#1c1917" stroke="#44403c" stroke-width="1.5"/>
+  <text x="300" y="514" text-anchor="middle" fill="#f5f5f4" font-family="sans-serif" font-weight="800" font-size="15">Logitech G Pro X Superlight 2</text>
+  <text x="300" y="534" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="700" font-size="12">LIGHTSPEED WIRELESS • HERO 2 32K • 60G</text>
+</svg>

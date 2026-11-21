@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#0c0a09"/>
+  <!-- Module 1 -->
+  <g transform="translate(15, -40)">
+    <path d="M90,200 L130,190 H450 L490,200 L482,300 H98 Z" fill="#1c1917" stroke="#57534e" stroke-width="2"/>
+    <rect x="108" y="300" width="175" height="14" rx="2" fill="#fbbf24"/>
+    <rect x="298" y="300" width="170" height="14" rx="2" fill="#fbbf24"/>
+    <text x="290" y="255" text-anchor="middle" fill="#d6d3d1" font-family="sans-serif" font-weight="900" font-size="22" letter-spacing="4">FURY BEAST</text>
+  </g>
+  <!-- Module 2 -->
+  <g transform="translate(0, 75)">
+    <path d="M90,200 L130,190 H450 L490,200 L482,300 H98 Z" fill="#292524" stroke="#a8a29e" stroke-width="2"/>
+    <rect x="108" y="300" width="175" height="14" rx="2" fill="#fbbf24"/>
+    <rect x="298" y="300" width="170" height="14" rx="2" fill="#fbbf24"/>
+    <text x="290" y="245" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-weight="900" font-size="22" letter-spacing="4">KINGSTON FURY</text>
+    <text x="290" y="278" text-anchor="middle" fill="#ef4444" font-family="monospace" font-weight="800" font-size="14">BEAST DDR4 • 3200MT/s CL16</text>
+  </g>
+  <!-- Bottom Label -->
+  <rect x="100" y="490" width="400" height="54" rx="14" fill="#1c1917" stroke="#44403c" stroke-width="1.5"/>
+  <text x="300" y="514" text-anchor="middle" fill="#f5f5f4" font-family="sans-serif" font-weight="800" font-size="15">Kingston Fury Beast 16GB Kit</text>
+  <text x="300" y="534" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="700" font-size="12">2x8GB DDR4-3200 • CL16 • LOW PROFILE</text>
+</svg>

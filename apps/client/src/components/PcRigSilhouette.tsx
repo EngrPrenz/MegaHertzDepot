@@ -18,10 +18,10 @@ import {
 } from 'lucide-react';
 
 interface PcRigSilhouetteProps {
-  selectedParts: Partial<Record<HardwareCategory, ProductLocal>>;
+  selectedParts: Partial<Record<HardwareCategory, ProductLocal | ProductLocal[]>>;
   activeCategory: HardwareCategory;
   onSelectCategory: (category: HardwareCategory) => void;
-  onRemovePart: (category: HardwareCategory) => void;
+  onRemovePart: (category: HardwareCategory, productId?: string) => void;
   currencySymbol?: string;
   className?: string;
 }
@@ -36,10 +36,17 @@ export function PcRigSilhouette({
 }: PcRigSilhouetteProps) {
   const [hoveredZone, setHoveredZone] = useState<HardwareCategory | null>(null);
 
+  const getPartList = (cat: HardwareCategory): ProductLocal[] => {
+    const val = selectedParts[cat];
+    if (!val) return [];
+    return Array.isArray(val) ? val : [val];
+  };
+
   // Helper to determine if a zone is active or hovered
   const isZoneActive = (cat: HardwareCategory) => activeCategory === cat;
   const isZoneHovered = (cat: HardwareCategory) => hoveredZone === cat;
-  const hasPart = (cat: HardwareCategory) => Boolean(selectedParts[cat]);
+  const hasPart = (cat: HardwareCategory) => getPartList(cat).length > 0;
+  const getPartCount = (cat: HardwareCategory) => getPartList(cat).length;
 
   // Color classes for zone outlines and fills
   const getZoneStroke = (cat: HardwareCategory) => {
@@ -57,7 +64,9 @@ export function PcRigSilhouette({
   };
 
   const currentHoveredOrActive = hoveredZone || activeCategory;
-  const selectedForActive = selectedParts[currentHoveredOrActive];
+  const selectedListForActive = getPartList(currentHoveredOrActive);
+  const selectedForActive = selectedListForActive[0];
+  const selectedTotalForActive = selectedListForActive.reduce((s, p) => s + (p.price || 0), 0);
 
   return (
     <div className={`flex flex-col bg-stone-900/80 border border-stone-800 rounded-2xl p-4 relative ${className}`}>
@@ -130,26 +139,10 @@ export function PcRigSilhouette({
             <circle cx="472" cy="38" r="4.5" fill="#292524" stroke="#78716c" strokeWidth="1" />
             <circle cx="48" cy="465" r="4.5" fill="#292524" stroke="#78716c" strokeWidth="1" />
             <circle cx="472" cy="465" r="4.5" fill="#292524" stroke="#78716c" strokeWidth="1" />
-
-            {/* Front Panel Mesh & 3x Intake Fans */}
-            <rect x="420" y="60" width="55" height="390" rx="8" fill="#141210" stroke="#292524" strokeWidth="1" />
-            {/* Intake Fan 1 */}
-            <circle cx="447" cy="115" r="30" fill="#1c1917" stroke={isZoneActive('Case') ? '#f59e0b' : '#292524'} strokeWidth="1.5" />
-            <circle cx="447" cy="115" r="10" fill="#292524" />
-            {/* Intake Fan 2 */}
-            <circle cx="447" cy="225" r="30" fill="#1c1917" stroke={isZoneActive('Case') ? '#f59e0b' : '#292524'} strokeWidth="1.5" />
-            <circle cx="447" cy="225" r="10" fill="#292524" />
-            {/* Intake Fan 3 */}
-            <circle cx="447" cy="335" r="30" fill="#1c1917" stroke={isZoneActive('Case') ? '#f59e0b' : '#292524'} strokeWidth="1.5" />
-            <circle cx="447" cy="335" r="10" fill="#292524" />
-
-            {/* Rear Exhaust Fan (120mm) */}
-            <circle cx="65" cy="155" r="24" fill="#141210" stroke="#292524" strokeWidth="1.5" />
-            <circle cx="65" cy="155" r="8" fill="#292524" />
           </g>
 
           {/* ======================================================== */}
-          {/* 2. TOP RADIATOR & AIO COOLING (ZONE: Cooling)            */}
+          {/* 2. TOP RADIATOR, FRONT INTAKE & REAR EXHAUST (Cooling)   */}
           {/* ======================================================== */}
           <g
             className="cursor-pointer transition-all duration-200"
@@ -157,6 +150,65 @@ export function PcRigSilhouette({
             onMouseEnter={() => setHoveredZone('Cooling')}
             onMouseLeave={() => setHoveredZone(null)}
           >
+            {/* Front Panel Mesh & 3x Case Intake Fans (Secondary Cooling Slot) */}
+            <rect
+              x="420"
+              y="60"
+              width="55"
+              height="390"
+              rx="8"
+              fill={getPartCount('Cooling') >= 2 ? 'rgba(245, 158, 11, 0.14)' : getZoneFill('Cooling')}
+              stroke={
+                isZoneActive('Cooling') || isZoneHovered('Cooling')
+                  ? '#f59e0b'
+                  : getPartCount('Cooling') >= 2
+                  ? '#d97706'
+                  : '#292524'
+              }
+              strokeWidth={isZoneActive('Cooling') || isZoneHovered('Cooling') ? 2 : 1.5}
+            />
+            {/* Intake Fan 1 */}
+            <circle
+              cx="447"
+              cy="115"
+              r="30"
+              fill="#1c1917"
+              stroke={getPartCount('Cooling') >= 2 || isZoneActive('Cooling') ? '#f59e0b' : '#44403c'}
+              strokeWidth="1.5"
+            />
+            <circle cx="447" cy="115" r="10" fill={getPartCount('Cooling') >= 2 ? '#d97706' : '#292524'} />
+            {/* Intake Fan 2 */}
+            <circle
+              cx="447"
+              cy="225"
+              r="30"
+              fill="#1c1917"
+              stroke={getPartCount('Cooling') >= 2 || isZoneActive('Cooling') ? '#f59e0b' : '#44403c'}
+              strokeWidth="1.5"
+            />
+            <circle cx="447" cy="225" r="10" fill={getPartCount('Cooling') >= 2 ? '#d97706' : '#292524'} />
+            {/* Intake Fan 3 */}
+            <circle
+              cx="447"
+              cy="335"
+              r="30"
+              fill="#1c1917"
+              stroke={getPartCount('Cooling') >= 2 || isZoneActive('Cooling') ? '#f59e0b' : '#44403c'}
+              strokeWidth="1.5"
+            />
+            <circle cx="447" cy="335" r="10" fill={getPartCount('Cooling') >= 2 ? '#d97706' : '#292524'} />
+
+            {/* Rear Exhaust Fan (120mm) */}
+            <circle
+              cx="65"
+              cy="155"
+              r="24"
+              fill="#141210"
+              stroke={getPartCount('Cooling') >= 2 || isZoneActive('Cooling') ? '#f59e0b' : '#292524'}
+              strokeWidth="1.5"
+            />
+            <circle cx="65" cy="155" r="8" fill={getPartCount('Cooling') >= 2 ? '#d97706' : '#292524'} />
+
             {/* Radiator Chamber */}
             <rect
               x="100"
@@ -542,7 +594,7 @@ export function PcRigSilhouette({
             </button>
           </div>
 
-          {/* Cooling Pin */}
+          {/* Top CPU / AIO Cooling Pin */}
           <div className="absolute top-[8%] left-[50%] -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5">
             <button
               type="button"
@@ -552,9 +604,29 @@ export function PcRigSilhouette({
                   ? 'bg-amber-500 text-stone-950 border-amber-300 ring-2 ring-amber-500/30'
                   : 'bg-stone-950/90 text-stone-300 border-stone-700 hover:border-amber-400'
               }`}
-              title="Cooling & AIO"
+              title="CPU Cooler / AIO Radiator"
             >
               {hasPart('Cooling') ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          {/* Front Case Fans Pin (2nd Cooling Component) */}
+          <div className="absolute top-[36%] left-[86%] -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onSelectCategory('Cooling')}
+              className={`pointer-events-auto p-1.5 rounded-full border shadow-lg transition-transform hover:scale-110 cursor-pointer ${
+                getPartCount('Cooling') >= 2
+                  ? 'bg-amber-500 text-stone-950 border-amber-300 ring-2 ring-amber-500/30'
+                  : 'bg-stone-950/90 text-stone-300 border-stone-700 hover:border-amber-400'
+              }`}
+              title="Case Fans / Additional Cooling"
+            >
+              {getPartCount('Cooling') >= 2 ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
             </button>
           </div>
 
@@ -568,9 +640,29 @@ export function PcRigSilhouette({
                   ? 'bg-amber-500 text-stone-950 border-amber-300 ring-2 ring-amber-500/30'
                   : 'bg-stone-950/90 text-stone-300 border-stone-700 hover:border-amber-400'
               }`}
-              title="NVMe Storage"
+              title="Primary NVMe Storage"
             >
               {hasPart('Storage') ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          {/* Secondary 2.5" / SATA Storage Pin */}
+          <div className="absolute top-[46.5%] left-[68%] -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onSelectCategory('Storage')}
+              className={`pointer-events-auto p-1 rounded-full border shadow-lg transition-transform hover:scale-110 cursor-pointer ${
+                getPartCount('Storage') >= 2
+                  ? 'bg-amber-500 text-stone-950 border-amber-300 ring-2 ring-amber-500/30'
+                  : 'bg-stone-950/90 text-stone-300 border-stone-700 hover:border-amber-400'
+              }`}
+              title="Secondary SSD / HDD Bay"
+            >
+              {getPartCount('Storage') >= 2 ? (
+                <CheckCircle2 className="w-3 h-3" />
+              ) : (
+                <Plus className="w-3 h-3" />
+              )}
             </button>
           </div>
 
@@ -593,9 +685,9 @@ export function PcRigSilhouette({
       </div>
 
       {/* Floating Status / Inspector Bar for Current Zone */}
-      <div className="mt-3 p-3 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="p-2 rounded-lg bg-stone-900 border border-stone-800 text-amber-400 shrink-0">
+      <div className="mt-3 p-3.5 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between gap-3.5 text-xs">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="p-2.5 rounded-lg bg-stone-900 border border-stone-800 text-amber-400 shrink-0">
             {currentHoveredOrActive === 'CPU' && <Cpu className="w-4 h-4" />}
             {currentHoveredOrActive === 'GPU' && <Sparkles className="w-4 h-4" />}
             {currentHoveredOrActive === 'Motherboard' && <Server className="w-4 h-4" />}
@@ -607,29 +699,35 @@ export function PcRigSilhouette({
             {currentHoveredOrActive === 'Monitor' && <Monitor className="w-4 h-4" />}
             {currentHoveredOrActive === 'Peripheral' && <MousePointer className="w-4 h-4" />}
           </div>
-          <div className="min-w-0">
-            <div className="font-bold text-white flex items-center gap-1.5 truncate">
+          <div className="min-w-0 space-y-0.5">
+            <div className="font-bold text-white text-sm flex items-center gap-2 truncate">
               <span>{currentHoveredOrActive}</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40">
-                Active Slot
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/40">
+                {selectedListForActive.length > 1
+                  ? `${selectedListForActive.length} Installed`
+                  : 'Active Slot'}
               </span>
             </div>
-            <div className="text-[11px] text-stone-400 truncate">
-              {selectedForActive ? selectedForActive.name : 'No component selected for this slot yet'}
+            <div className="text-xs text-stone-400 leading-snug line-clamp-2">
+              {selectedListForActive.length > 1
+                ? selectedListForActive.map((p) => p.name).join(' + ')
+                : selectedForActive
+                ? selectedForActive.name
+                : 'No component selected for this slot yet'}
             </div>
           </div>
         </div>
 
         {selectedForActive ? (
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="font-mono font-bold text-amber-400">
-              {formatCurrency(selectedForActive.price || 0, currencySymbol)}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="font-mono font-bold text-sm text-amber-400">
+              {formatCurrency(selectedTotalForActive, currencySymbol)}
             </span>
             <button
               type="button"
               onClick={() => onRemovePart(currentHoveredOrActive)}
-              className="p-1 rounded-lg text-stone-500 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
-              title="Remove component"
+              className="p-1.5 rounded-lg text-stone-500 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
+              title="Clear slot"
             >
               <X className="w-4 h-4" />
             </button>
@@ -638,7 +736,7 @@ export function PcRigSilhouette({
           <button
             type="button"
             onClick={() => onSelectCategory(currentHoveredOrActive)}
-            className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-[11px] shrink-0 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs shrink-0 cursor-pointer"
           >
             Browse Parts
           </button>
@@ -646,10 +744,11 @@ export function PcRigSilhouette({
       </div>
 
       {/* Quick Category Selector Pills (includes Monitor & Peripherals) */}
-      <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+      <div className="mt-3.5 flex flex-wrap items-center gap-2">
         {(['CPU', 'Motherboard', 'RAM', 'GPU', 'Storage', 'PSU', 'Cooling', 'Case', 'Monitor', 'Peripheral'] as HardwareCategory[]).map(
           (cat) => {
-            const hasIt = Boolean(selectedParts[cat]);
+            const count = getPartCount(cat);
+            const hasIt = count > 0;
             const isCurrent = activeCategory === cat;
             return (
               <button
@@ -658,16 +757,16 @@ export function PcRigSilhouette({
                 onClick={() => onSelectCategory(cat)}
                 onMouseEnter={() => setHoveredZone(cat)}
                 onMouseLeave={() => setHoveredZone(null)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
                   isCurrent
                     ? 'bg-amber-500 text-stone-950 font-bold shadow'
                     : hasIt
                     ? 'bg-stone-950 text-amber-300 border border-amber-800/60'
-                    : 'bg-stone-950 text-stone-400 hover:text-white border border-stone-800'
+                    : 'bg-stone-950 text-stone-300 hover:text-white border border-stone-800'
                 }`}
               >
-                {hasIt && <CheckCircle2 className="w-3 h-3 text-amber-400 shrink-0" />}
-                <span>{cat}</span>
+                {hasIt && <CheckCircle2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                <span>{count > 1 ? `${cat} (${count})` : cat}</span>
               </button>
             );
           }

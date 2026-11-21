@@ -4,6 +4,7 @@ import {
   HardwareSpecs,
   PaymentMethod,
   SaleOrderItem,
+  getDefaultCatalogImageUrl,
 } from '@countwise/shared';
 
 export interface ProductLocal {
@@ -73,7 +74,8 @@ export interface OutboxMutation {
     | 'product.update'
     | 'product.delete'
     | 'adjustment.create'
-    | 'order.create';
+    | 'order.create'
+    | 'order.update';
   entityId?: string;
   payload: any;
   hlc: string;
@@ -96,6 +98,16 @@ export interface ClientMeta {
   value: any;
 }
 
+export interface LocalProductImage {
+  id: string;
+  blob?: Blob;
+  dataUrl: string;
+  mimeType: string;
+  size: number;
+  fileName?: string;
+  createdAt: number;
+}
+
 export class CountwiseDatabase extends Dexie {
   products!: Table<ProductLocal, string>;
   adjustments!: Table<AdjustmentLocal, string>;
@@ -103,6 +115,7 @@ export class CountwiseDatabase extends Dexie {
   outbox!: Table<OutboxMutation, string>;
   storesTable!: Table<LocalStoreRecord, string>;
   meta!: Table<ClientMeta, string>;
+  productImages!: Table<LocalProductImage, string>;
 
   constructor(dbName: string = 'countwise_db') {
     super(dbName);
@@ -168,6 +181,32 @@ export class CountwiseDatabase extends Dexie {
             }
             if (!product.priceHlc) {
               product.priceHlc = product.nameHlc;
+            }
+          });
+      });
+
+    // Version 4: Local-only productImages blob store + automatic catalog imageUrl backfill
+    this.version(4)
+      .stores({
+        products: 'id, storeId, category, brand, name, sku, nameHlc, deletedAt, serverSeq',
+        adjustments: 'id, productId, storeId, reason, createdAt, hlc, deviceId',
+        orders: 'id, storeId, receiptNumber, paymentMethod, createdAt, hlc, deviceId',
+        outbox: 'mutationId, storeId, entityId, type, status, createdAt, attempts',
+        storesTable: 'id, name',
+        meta: 'key',
+        productImages: 'id, createdAt',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('products')
+          .toCollection()
+          .modify((product: ProductLocal) => {
+            if (!product.imageUrl) {
+              const catalogImg = getDefaultCatalogImageUrl(product.sku, product.name);
+              if (catalogImg) {
+                product.imageUrl = catalogImg;
+                product.imageHlc = product.nameHlc;
+              }
             }
           });
       });

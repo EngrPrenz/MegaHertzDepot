@@ -66,7 +66,7 @@ export function CustomerAuthModal({
     setLoading(true);
 
     try {
-      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
+      const endpoint = mode === 'login' ? '/auth/customer/login' : '/auth/customer/register';
       const body =
         mode === 'login'
           ? { email: email.trim(), password }

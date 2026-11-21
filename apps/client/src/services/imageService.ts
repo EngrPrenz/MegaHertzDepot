@@ -1,7 +1,47 @@
+import { localDb, LocalProductImage } from '../db/index.js';
+
 /**
- * Client-side image compression and upload service.
- * Compresses images in-browser to max 800x800 WebP to minimize bandwidth and storage.
+ * Client-side image compression and local IndexedDB storage service.
+ * Compresses images in-browser to max 800x800 WebP and stores them locally in IndexedDB
+ * (`localDb.productImages`) referenced by compact `local-img://<id>` URIs so free-plan
+ * cloud databases and storage buckets never hit their limits.
  */
+
+export const LOCAL_IMAGE_PREFIX = 'local-img://';
+
+function generateImageId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+export function isLocalImageUri(url?: string | null): boolean {
+  return Boolean(url && url.startsWith(LOCAL_IMAGE_PREFIX));
+}
+
+export function extractLocalImageId(url: string): string {
+  return url.startsWith(LOCAL_IMAGE_PREFIX) ? url.slice(LOCAL_IMAGE_PREFIX.length) : url;
+}
+
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to convert image blob to data URL'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read image blob'));
+    reader.readAsDataURL(blob);
+  });
+}
 
 export async function compressImage(
   file: File | Blob,
@@ -43,7 +83,6 @@ export async function compressImage(
             if (blob) {
               resolve(blob);
             } else {
-              // Fallback
               canvas.toBlob(
                 (fallbackBlob) => {
                   if (fallbackBlob) resolve(fallbackBlob);
@@ -65,51 +104,47 @@ export async function compressImage(
 }
 
 /**
- * Uploads an image to the local backend server.
- * If offline or demo token, returns a local Base64/Object URL so offline works seamlessly.
+ * Compresses a product image and stores it in the local IndexedDB `productImages` table.
+ * Returns a compact `local-img://<uuid>` URI (under 55 chars) so that syncing product metadata
+ * never bloats the cloud database or requires external storage buckets.
  */
 export async function uploadProductImage(
   file: File | Blob,
-  token?: string | null
+  _token?: string | null
 ): Promise<string> {
-  // Always compress image first
-  const compressedBlob = await compressImage(file, 800, 800, 0.85);
+  const compressedBlob = await compressImage(file, 800, 800, 0.84);
+  const dataUrl = await blobToDataUrl(compressedBlob);
+  const id = generateImageId();
+  const fileName = file instanceof File ? file.name : `product-${id.slice(0, 8)}.webp`;
 
-  const isDemoOrOffline = !token || token === 'offline_demo_token' || !navigator.onLine;
+  const record: LocalProductImage = {
+    id,
+    blob: compressedBlob,
+    dataUrl,
+    mimeType: compressedBlob.type || 'image/webp',
+    size: compressedBlob.size,
+    fileName,
+    createdAt: Date.now(),
+  };
 
-  if (isDemoOrOffline) {
-    // Offline / Demo fallback: convert blob to Base64 data URL
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result);
-        } else {
-          reject(new Error('Failed to convert offline image to data URL'));
-        }
-      };
-      reader.onerror = () => reject(new Error('Failed to process offline image'));
-      reader.readAsDataURL(compressedBlob);
-    });
-  }
+  await localDb.productImages.put(record);
+  return `${LOCAL_IMAGE_PREFIX}${id}`;
+}
 
-  // Online upload to backend server disk
-  const formData = new FormData();
-  formData.append('image', compressedBlob, 'product.webp');
+export async function deleteLocalProductImage(imageUrl?: string | null): Promise<void> {
+  if (!isLocalImageUri(imageUrl)) return;
+  const id = extractLocalImageId(imageUrl!);
+  await localDb.productImages.delete(id);
+}
 
-  const response = await fetch('/upload', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Upload failed with HTTP status ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.url;
+export async function getLocalImageStorageStats(): Promise<{
+  count: number;
+  totalBytes: number;
+}> {
+  const all = await localDb.productImages.toArray();
+  const totalBytes = all.reduce((sum, item) => sum + (item.size || 0), 0);
+  return {
+    count: all.length,
+    totalBytes,
+  };
 }

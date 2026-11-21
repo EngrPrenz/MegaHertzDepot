@@ -4,12 +4,14 @@ import { localDb, ProductLocal } from '../db/index.js';
 import { localRepository } from '../services/localRepository.js';
 import { ModalDialog } from '../components/ModalDialog.js';
 import { ProductImage } from '../components/ProductImage.js';
+import { uploadProductImage } from '../services/imageService.js';
 import {
   computeDerivedStock,
   analyzeStockCountSemantics,
   AdjustmentReason,
   HARDWARE_CATEGORIES,
   HardwareCategory,
+  SAMPLE_PC_HARDWARE_CATALOG,
   formatCurrency,
 } from '@countwise/shared';
 import {
@@ -66,6 +68,8 @@ export function InventoryPage({
   const [newRamType, setNewRamType] = useState('');
   const [newWattage, setNewWattage] = useState('');
   const [newInitialStock, setNewInitialStock] = useState('0');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [newUploading, setNewUploading] = useState(false);
 
   // Edit Product Modal State
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -79,6 +83,8 @@ export function InventoryPage({
   const [editSocket, setEditSocket] = useState('');
   const [editRamType, setEditRamType] = useState('');
   const [editWattage, setEditWattage] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editUploading, setEditUploading] = useState(false);
 
   // Stock Adjustment Form State inside Product Detail
   const [adjMode, setAdjMode] = useState<'delta' | 'count'>('delta');
@@ -187,6 +193,25 @@ export function InventoryPage({
     [enrichedProducts, selectedProductId]
   );
 
+  const oversoldItems = useMemo(
+    () => enrichedProducts.filter((i) => i.isOversold),
+    [enrichedProducts]
+  );
+
+  const handleReconcileOversoldToZero = async () => {
+    for (const item of oversoldItems) {
+      await localRepository.recordPhysicalCount({
+        productId: item.product.id,
+        storeId,
+        countedPhysical: 0,
+        userId,
+      });
+    }
+    if (filter === 'oversold') {
+      setFilter('all');
+    }
+  };
+
   const handleSeedCatalog = async () => {
     setSeeding(true);
     try {
@@ -218,6 +243,7 @@ export function InventoryPage({
         ...(newRamType.trim() ? { ramType: newRamType.trim() } : {}),
         ...(wattageNum !== undefined && !isNaN(wattageNum) ? { wattage: wattageNum } : {}),
       },
+      imageUrl: newImageUrl.trim() || undefined,
       initialStock: initialStockNum,
       userId,
     });
@@ -229,6 +255,7 @@ export function InventoryPage({
     setNewSocket('');
     setNewRamType('');
     setNewWattage('');
+    setNewImageUrl('');
     setNewInitialStock('0');
     setIsAddOpen(false);
     setSelectedProductId(created.id);
@@ -284,6 +311,7 @@ export function InventoryPage({
     setEditSocket(p.specs?.socket || '');
     setEditRamType(p.specs?.ramType || '');
     setEditWattage(p.specs?.wattage != null ? String(p.specs.wattage) : '');
+    setEditImageUrl(p.imageUrl || '');
     setIsEditOpen(true);
   };
 
@@ -309,6 +337,7 @@ export function InventoryPage({
         ...(editRamType.trim() ? { ramType: editRamType.trim() } : {}),
         ...(wattageNum !== undefined && !isNaN(wattageNum) ? { wattage: wattageNum } : {}),
       },
+      imageUrl: editImageUrl.trim() || null,
     });
     setIsEditOpen(false);
   };
@@ -323,17 +352,57 @@ export function InventoryPage({
   };
 
   // CSV Export & Import with PC Hardware fields
+  const escapeCsvCell = (value: unknown): string => {
+    let str = value === null || value === undefined ? '' : String(value);
+    if (/^[=+\-@\t\r]/.test(str) && !/^-\d+(\.\d+)?$/.test(str)) {
+      str = `'${str}`;
+    }
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const parseCsvLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i + 1 < line.length && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          current += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
   const handleExportCsv = () => {
     const header = 'name,sku,category,brand,price,warranty,stock\n';
     const rows = enrichedProducts
-      .map(
-        (i) =>
-          `"${i.product.name.replace(/"/g, '""')}","${(i.product.sku || '').replace(
-            /"/g,
-            '""'
-          )}","${i.product.category || ''}","${(i.product.brand || '').replace(/"/g, '""')}",${
-            i.product.price || 0
-          },"${(i.product.warranty || '').replace(/"/g, '""')}",${i.stock}`
+      .map((i) =>
+        [
+          escapeCsvCell(i.product.name),
+          escapeCsvCell(i.product.sku || ''),
+          escapeCsvCell(i.product.category || ''),
+          escapeCsvCell(i.product.brand || ''),
+          Number(i.product.price || 0),
+          escapeCsvCell(i.product.warranty || ''),
+          Number(i.stock || 0),
+        ].join(',')
       )
       .join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
@@ -351,13 +420,13 @@ export function InventoryPage({
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
     for (let idx = 1; idx < lines.length; idx++) {
-      const cols = lines[idx].split(',').map((c) => c.replace(/^"|"$/g, '').trim());
+      const cols = parseCsvLine(lines[idx]);
       const [name, sku, stockOrCat, brand, priceStr, warranty, stockStr] = cols;
       if (name) {
         // Support both 3-col (name,sku,stock) and 7-col hardware CSVs
         const isExtended = cols.length >= 5;
         const initialStock = parseInt((isExtended ? stockStr : stockOrCat) || '0', 10) || 0;
-        const price = isExtended ? parseFloat(priceStr || '0') || 0 : 0;
+        const price = isExtended ? Math.max(0, parseFloat(priceStr || '0') || 0) : 0;
         await localRepository.createProduct({
           storeId,
           name,
@@ -391,7 +460,7 @@ export function InventoryPage({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {products.length === 0 && (
+          {products.length < SAMPLE_PC_HARDWARE_CATALOG.length && (
             <button
               type="button"
               onClick={handleSeedCatalog}
@@ -400,7 +469,13 @@ export function InventoryPage({
               className="px-3 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>{seeding ? 'Seeding...' : 'Seed Sample Hardware'}</span>
+              <span>
+                {seeding
+                  ? 'Seeding...'
+                  : products.length === 0
+                  ? `Seed Sample Hardware (${SAMPLE_PC_HARDWARE_CATALOG.length})`
+                  : `Seed Missing Hardware (+${SAMPLE_PC_HARDWARE_CATALOG.length - products.length})`}
+              </span>
             </button>
           )}
 
@@ -514,6 +589,52 @@ export function InventoryPage({
         </select>
       </div>
 
+      {/* Negative Stock Conflict Alert Banner (Offline Multi-Terminal Oversell Detection) */}
+      {oversoldItems.length > 0 && (
+        <div
+          data-testid="negative-stock-conflict-banner"
+          className="p-4 rounded-2xl bg-rose-950/40 border border-rose-700/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <div className="font-bold text-rose-200">
+                Negative Stock Conflict Detected ({oversoldItems.length} item
+                {oversoldItems.length > 1 ? 's' : ''})
+              </div>
+              <p className="text-rose-300/90 leading-relaxed">
+                Concurrent offline sales reduced derived stock below zero:{' '}
+                <span className="font-mono font-semibold text-white">
+                  {oversoldItems
+                    .slice(0, 3)
+                    .map((i) => `${i.product.name} (${i.stock})`)
+                    .join(', ')}
+                  {oversoldItems.length > 3 ? ` +${oversoldItems.length - 3} more` : ''}
+                </span>
+                . Verify physical shelf units or reconcile to 0.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setFilter(filter === 'oversold' ? 'all' : 'oversold')}
+              className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-rose-700/60 text-rose-200 text-xs font-semibold cursor-pointer transition"
+            >
+              {filter === 'oversold' ? 'Show All' : 'Inspect Oversold'}
+            </button>
+            <button
+              type="button"
+              onClick={handleReconcileOversoldToZero}
+              className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold cursor-pointer transition shadow-sm"
+            >
+              Reconcile All to 0
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Master-Detail Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Product List Column */}
@@ -526,7 +647,7 @@ export function InventoryPage({
               <div>
                 <h3 className="text-sm font-semibold text-white">No hardware components found</h3>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  Add your first component offline, seed the 14-item PC catalog, or adjust your
+                  Add your first component offline, seed the {SAMPLE_PC_HARDWARE_CATALOG.length}-item PC catalog, or adjust your
                   search filter. All changes save instantly to IndexedDB.
                 </p>
               </div>
@@ -539,7 +660,7 @@ export function InventoryPage({
                     className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4" />
-                    <span>{seeding ? 'Seeding...' : 'Seed 14 PC Components'}</span>
+                    <span>{seeding ? 'Seeding...' : `Seed ${SAMPLE_PC_HARDWARE_CATALOG.length} PC Components`}</span>
                   </button>
                 )}
                 <button
@@ -929,6 +1050,66 @@ export function InventoryPage({
         subtitle="Writes immediately to local IndexedDB and queues for sync."
       >
         <form onSubmit={handleCreateProduct} className="space-y-3.5">
+          {/* Local Product Image Upload / Preset Selector */}
+          <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+            <ProductImage
+              imageUrl={newImageUrl}
+              sku={newSku}
+              name={newName || 'New Hardware'}
+              category={newCategory}
+              className="w-16 h-16 rounded-xl shrink-0"
+            />
+            <div className="flex-1 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-xl text-xs font-bold shadow cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{newUploading ? 'Optimizing...' : 'Upload Local Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    disabled={newUploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setNewUploading(true);
+                      try {
+                        const uri = await uploadProductImage(file);
+                        setNewImageUrl(uri);
+                      } finally {
+                        setNewUploading(false);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+                {newImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setNewImageUrl('')}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 rounded-lg text-xs cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <select
+                value={newImageUrl.startsWith('/images/products/') ? newImageUrl : ''}
+                onChange={(e) => {
+                  if (e.target.value) setNewImageUrl(e.target.value);
+                }}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300"
+              >
+                <option value="">Or choose a built-in local hardware preset image...</option>
+                {SAMPLE_PC_HARDWARE_CATALOG.filter((item) => item.imageUrl).map((item) => (
+                  <option key={item.sku} value={item.imageUrl}>
+                    [{item.category}] {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">
               Component / Model Name
@@ -1093,6 +1274,66 @@ export function InventoryPage({
         subtitle="Uses per-field Hybrid Logical Clock (HLC) Last-Write-Wins."
       >
         <form onSubmit={handleSaveEdit} className="space-y-3.5">
+          {/* Local Product Image Upload / Preset Selector */}
+          <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+            <ProductImage
+              imageUrl={editImageUrl}
+              sku={editSku}
+              name={editName || 'Edit Hardware'}
+              category={editCategory}
+              className="w-16 h-16 rounded-xl shrink-0"
+            />
+            <div className="flex-1 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-xl text-xs font-bold shadow cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{editUploading ? 'Optimizing...' : 'Replace Local Photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    disabled={editUploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setEditUploading(true);
+                      try {
+                        const uri = await uploadProductImage(file);
+                        setEditImageUrl(uri);
+                      } finally {
+                        setEditUploading(false);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                </label>
+                {editImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setEditImageUrl('')}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/40 text-slate-300 hover:text-rose-300 rounded-lg text-xs cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <select
+                value={editImageUrl.startsWith('/images/products/') ? editImageUrl : ''}
+                onChange={(e) => {
+                  if (e.target.value) setEditImageUrl(e.target.value);
+                }}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300"
+              >
+                <option value="">Or choose a built-in local hardware preset image...</option>
+                {SAMPLE_PC_HARDWARE_CATALOG.filter((item) => item.imageUrl).map((item) => (
+                  <option key={item.sku} value={item.imageUrl}>
+                    [{item.category}] {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1">Component Name</label>
             <input

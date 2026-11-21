@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#0c0a09"/>
+  <!-- ATX PSU Chassis -->
+  <rect x="125" y="95" width="350" height="350" rx="18" fill="#18181b" stroke="#52525b" stroke-width="3"/>
+  <!-- Triangular Fan Grille -->
+  <circle cx="300" cy="270" r="135" fill="#09090b" stroke="#3f3f46" stroke-width="4"/>
+  <circle cx="300" cy="270" r="100" fill="none" stroke="#27272a" stroke-width="2" stroke-dasharray="10 6"/>
+  <circle cx="300" cy="270" r="65" fill="none" stroke="#27272a" stroke-width="2" stroke-dasharray="8 6"/>
+  <!-- Center Corsair Badge -->
+  <rect x="240" y="242" width="120" height="56" rx="10" fill="#18181b" stroke="#fbbf24" stroke-width="2"/>
+  <text x="300" y="268" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-weight="900" font-size="16">CORSAIR</text>
+  <text x="300" y="288" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="900" font-size="15">RM750e</text>
+  <!-- 80+ Gold Pill -->
+  <rect x="150" y="115" width="95" height="26" rx="6" fill="#f59e0b"/>
+  <text x="197" y="132" text-anchor="middle" fill="#0c0a09" font-family="monospace" font-weight="900" font-size="12">80+ GOLD</text>
+  <text x="415" y="132" text-anchor="middle" fill="#a1a1aa" font-family="monospace" font-weight="700" font-size="12">ATX 3.0</text>
+  <!-- Bottom Label -->
+  <rect x="100" y="490" width="400" height="54" rx="14" fill="#1c1917" stroke="#44403c" stroke-width="1.5"/>
+  <text x="300" y="514" text-anchor="middle" fill="#f5f5f4" font-family="sans-serif" font-weight="800" font-size="15">Corsair RM750e 750W Fully Modular</text>
+  <text x="300" y="534" text-anchor="middle" fill="#fbbf24" font-family="monospace" font-weight="700" font-size="12">80+ GOLD • ATX 3.0 &amp; PCIe 5.0 READY</text>
+</svg>

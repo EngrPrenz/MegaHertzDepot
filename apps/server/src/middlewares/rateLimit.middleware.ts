@@ -7,6 +7,21 @@ interface RateLimitBucket {
 
 const buckets = new Map<string, RateLimitBucket>();
 
+function pruneExpiredBuckets(now: number): void {
+  for (const [key, bucket] of buckets.entries()) {
+    if (now > bucket.resetAt) {
+      buckets.delete(key);
+    }
+  }
+}
+
+const cleanupInterval = setInterval(() => {
+  pruneExpiredBuckets(Date.now());
+}, 60_000);
+if (typeof cleanupInterval.unref === 'function') {
+  cleanupInterval.unref();
+}
+
 export function createRateLimiter(options: { windowMs: number; max: number }) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (process.env.NODE_ENV === 'test') {
@@ -17,6 +32,10 @@ export function createRateLimiter(options: { windowMs: number; max: number }) {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const key = `${req.baseUrl}:${ip}`;
     const now = Date.now();
+
+    if (buckets.size > 5000) {
+      pruneExpiredBuckets(now);
+    }
 
     let bucket = buckets.get(key);
     if (!bucket || now > bucket.resetAt) {

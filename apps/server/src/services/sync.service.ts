@@ -9,6 +9,7 @@ import {
   storeMembers,
 } from '../db/schema.js';
 import { isPostgresAvailable, memoryDb } from '../db/memory-fallback.js';
+import { config } from '../config.js';
 import {
   SyncPushRequest,
   SyncPushResponse,
@@ -20,13 +21,16 @@ import {
   productDeletePayloadSchema,
   adjustmentCreatePayloadSchema,
   orderCreatePayloadSchema,
+  orderUpdatePayloadSchema,
   mergeProductCreate,
   mergeProductUpdate,
   mergeProductDelete,
   clampHlc,
+  HybridLogicalClock,
   Product,
   Adjustment,
   SaleOrder,
+  PaymentMethod,
   HardwareCategory,
   HardwareSpecs,
 } from '@countwise/shared';
@@ -100,10 +104,28 @@ export class SyncService {
         continue;
       }
 
-      // 2. Authorize store membership
-      const isMember = memoryDb.storeMembers.some(
+      // 2. Authorize store membership (auto-provision in development only)
+      let isMember = memoryDb.storeMembers.some(
         (m) => m.storeId === mutation.storeId && m.userId === userId
       );
+      if (
+        config.NODE_ENV === 'development' &&
+        !isMember &&
+        !memoryDb.stores.has(mutation.storeId)
+      ) {
+        memoryDb.stores.set(mutation.storeId, {
+          id: mutation.storeId,
+          name: 'MegaHertz Depot — Branch',
+          ownerId: userId,
+          createdAt: new Date(serverNow),
+        });
+        memoryDb.storeMembers.push({
+          storeId: mutation.storeId,
+          userId,
+          role: 'owner',
+        });
+        isMember = true;
+      }
       if (!isMember) {
         results.push({
           mutationId: mutation.mutationId,
@@ -321,6 +343,24 @@ export class SyncService {
             continue;
           }
 
+          const computedSubtotal = parsed.data.items.reduce(
+            (sum, item) => sum + item.quantity * item.unitPrice,
+            0
+          );
+          if (
+            parsed.data.discountAmount > parsed.data.subtotal + 0.01 ||
+            Math.abs(computedSubtotal - parsed.data.subtotal) > 1 ||
+            parsed.data.totalAmount < 0 ||
+            parsed.data.totalAmount > parsed.data.subtotal + parsed.data.taxAmount + 500
+          ) {
+            results.push({
+              mutationId: mutation.mutationId,
+              status: 'rejected',
+              reason: 'Order subtotal or discount validation failed',
+            });
+            continue;
+          }
+
           if (!memoryDb.orders.has(parsed.data.id)) {
             const clampedHlc = clampHlc(parsed.data.hlc, serverNow);
             const seq = memoryDb.nextSeq();
@@ -367,6 +407,57 @@ export class SyncService {
           });
 
           results.push({ mutationId: mutation.mutationId, status: 'applied' });
+        } else if (mutation.type === 'order.update') {
+          const parsed = orderUpdatePayloadSchema.safeParse(mutation.payload);
+          if (!parsed.success || parsed.data.storeId !== mutation.storeId) {
+            results.push({
+              mutationId: mutation.mutationId,
+              status: 'rejected',
+              reason: 'Invalid order.update payload',
+            });
+            continue;
+          }
+
+          const existing = memoryDb.orders.get(parsed.data.id);
+          if (!existing || existing.storeId !== mutation.storeId) {
+            results.push({
+              mutationId: mutation.mutationId,
+              status: 'rejected',
+              reason: 'Order not found in store',
+            });
+            continue;
+          }
+
+          const clampedHlc = clampHlc(parsed.data.hlc, serverNow);
+          if (HybridLogicalClock.compare(clampedHlc, existing.hlc) >= 0) {
+            const seq = memoryDb.nextSeq();
+            const updatedOrder: SaleOrder = {
+              ...existing,
+              ...(parsed.data.items !== undefined ? { items: parsed.data.items } : {}),
+              ...(parsed.data.notes !== undefined ? { notes: parsed.data.notes ?? null } : {}),
+              hlc: clampedHlc,
+              serverSeq: seq,
+            };
+            memoryDb.orders.set(updatedOrder.id, updatedOrder);
+
+            memoryDb.changeLog.push({
+              seq,
+              storeId: mutation.storeId,
+              entityType: 'order',
+              entityId: updatedOrder.id,
+              op: 'upsert',
+              payload: updatedOrder as any,
+              createdAt: new Date(serverNow).toISOString(),
+            });
+          }
+
+          memoryDb.appliedMutations.set(mutation.mutationId, {
+            mutationId: mutation.mutationId,
+            deviceId: request.deviceId,
+            appliedAt: new Date(serverNow),
+          });
+
+          results.push({ mutationId: mutation.mutationId, status: 'applied' });
         }
       } catch (err: any) {
         results.push({
@@ -381,9 +472,27 @@ export class SyncService {
   }
 
   private static pullMemory(userId: string, query: SyncPullQuery): SyncPullResponse {
-    const isMember = memoryDb.storeMembers.some(
+    let isMember = memoryDb.storeMembers.some(
       (m) => m.storeId === query.storeId && m.userId === userId
     );
+    if (
+      config.NODE_ENV === 'development' &&
+      !isMember &&
+      !memoryDb.stores.has(query.storeId)
+    ) {
+      memoryDb.stores.set(query.storeId, {
+        id: query.storeId,
+        name: 'MegaHertz Depot — Branch',
+        ownerId: userId,
+        createdAt: new Date(),
+      });
+      memoryDb.storeMembers.push({
+        storeId: query.storeId,
+        userId,
+        role: 'owner',
+      });
+      isMember = true;
+    }
     if (!isMember) {
       const err: any = new Error('Forbidden: user is not a member of this store');
       err.status = 403;
@@ -749,6 +858,23 @@ export class SyncService {
               };
             }
 
+            const computedSubtotal = parsed.data.items.reduce(
+              (sum, item) => sum + item.quantity * item.unitPrice,
+              0
+            );
+            if (
+              parsed.data.discountAmount > parsed.data.subtotal + 0.01 ||
+              Math.abs(computedSubtotal - parsed.data.subtotal) > 1 ||
+              parsed.data.totalAmount < 0 ||
+              parsed.data.totalAmount > parsed.data.subtotal + parsed.data.taxAmount + 500
+            ) {
+              return {
+                mutationId: mutation.mutationId,
+                status: 'rejected',
+                reason: 'Order subtotal or discount validation failed',
+              };
+            }
+
             const existingOrder = await tx.query.saleOrders.findFirst({
               where: eq(saleOrders.id, parsed.data.id),
             });
@@ -800,6 +926,83 @@ export class SyncService {
                 deviceId: orderPayload.deviceId,
                 userId: orderPayload.userId,
               });
+
+              await tx.insert(changeLog).values({
+                storeId: mutation.storeId,
+                entityType: 'order',
+                entityId: orderPayload.id,
+                op: 'upsert',
+                payload: orderPayload,
+              });
+            }
+
+            await tx.insert(appliedMutations).values({
+              mutationId: mutation.mutationId,
+              deviceId: request.deviceId,
+            });
+
+            return { mutationId: mutation.mutationId, status: 'applied' };
+          }
+
+          if (mutation.type === 'order.update') {
+            const parsed = orderUpdatePayloadSchema.safeParse(mutation.payload);
+            if (!parsed.success || parsed.data.storeId !== mutation.storeId) {
+              return {
+                mutationId: mutation.mutationId,
+                status: 'rejected',
+                reason: 'Invalid order.update payload',
+              };
+            }
+
+            const existingRow = await tx.query.saleOrders.findFirst({
+              where: eq(saleOrders.id, parsed.data.id),
+            });
+            if (!existingRow || existingRow.storeId !== mutation.storeId) {
+              return {
+                mutationId: mutation.mutationId,
+                status: 'rejected',
+                reason: 'Order not found in store',
+              };
+            }
+
+            const clampedHlc = clampHlc(parsed.data.hlc, serverNow);
+            if (HybridLogicalClock.compare(clampedHlc, existingRow.hlc) >= 0) {
+              const updatedItems =
+                parsed.data.items ?? (existingRow.items as SaleOrder['items']);
+              const updatedNotes =
+                parsed.data.notes !== undefined ? parsed.data.notes ?? null : existingRow.notes;
+
+              await tx
+                .update(saleOrders)
+                .set({
+                  items: updatedItems,
+                  notes: updatedNotes,
+                  hlc: clampedHlc,
+                })
+                .where(eq(saleOrders.id, existingRow.id));
+
+              const orderPayload: SaleOrder = {
+                id: existingRow.id,
+                storeId: existingRow.storeId,
+                receiptNumber: existingRow.receiptNumber,
+                customerName: existingRow.customerName ?? null,
+                customerPhone: existingRow.customerPhone ?? null,
+                items: updatedItems,
+                subtotal: Number(existingRow.subtotal),
+                discountAmount: Number(existingRow.discountAmount),
+                taxRate: Number(existingRow.taxRate),
+                taxInclusive: Boolean(existingRow.taxInclusive),
+                taxAmount: Number(existingRow.taxAmount),
+                totalAmount: Number(existingRow.totalAmount),
+                paymentMethod: existingRow.paymentMethod as PaymentMethod,
+                amountTendered: Number(existingRow.amountTendered),
+                changeDue: Number(existingRow.changeDue),
+                notes: updatedNotes,
+                createdAt: Number(existingRow.createdAt),
+                hlc: clampedHlc,
+                deviceId: existingRow.deviceId,
+                userId: existingRow.userId,
+              };
 
               await tx.insert(changeLog).values({
                 storeId: mutation.storeId,

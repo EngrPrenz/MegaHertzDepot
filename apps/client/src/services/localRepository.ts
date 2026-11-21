@@ -10,7 +10,9 @@ import {
   ProductDeletePayload,
   AdjustmentCreatePayload,
   OrderCreatePayload,
+  OrderUpdatePayload,
   SAMPLE_PC_HARDWARE_CATALOG,
+  getDefaultCatalogImageUrl,
   computeDerivedStock,
   analyzeStockCountSemantics,
   CountDiscrepancyInfo,
@@ -139,7 +141,8 @@ export class LocalFirstRepository {
     const costPrice = params.costPrice;
     const warranty = params.warranty?.trim() || '1 Year Store Warranty';
     const specs = params.specs;
-    const imageUrl = params.imageUrl?.trim() || undefined;
+    const imageUrl =
+      params.imageUrl?.trim() || getDefaultCatalogImageUrl(trimmedSku, params.name) || undefined;
 
     const product: ProductLocal = {
       id: productId,
@@ -642,13 +645,21 @@ export class LocalFirstRepository {
       .equals(storeId)
       .filter((p) => !p.deletedAt)
       .toArray();
-    const existingSkus = new Set(existingProducts.map((p) => p.sku).filter(Boolean));
+    const existingSkus = new Set(
+      existingProducts.map((p) => p.sku?.trim().toUpperCase()).filter(Boolean)
+    );
+    const existingNames = new Set(
+      existingProducts.map((p) => p.name.trim().toLowerCase()).filter(Boolean)
+    );
 
     let seededCount = 0;
     let baseNow = Date.now();
 
     for (const sample of SAMPLE_PC_HARDWARE_CATALOG) {
-      if (existingSkus.has(sample.sku)) {
+      if (
+        existingSkus.has(sample.sku.trim().toUpperCase()) ||
+        existingNames.has(sample.name.trim().toLowerCase())
+      ) {
         continue;
       }
       baseNow += 5;
@@ -663,6 +674,7 @@ export class LocalFirstRepository {
         costPrice: sample.costPrice,
         warranty: sample.warranty,
         specs: sample.specs,
+        imageUrl: sample.imageUrl,
         initialStock: sample.initialStock,
         now: baseNow,
       });
@@ -693,6 +705,176 @@ export class LocalFirstRepository {
       attempts: 0,
       lastError: undefined,
     });
+  }
+
+  /**
+   * Voids / refunds an existing sale order and restocks all items back into inventory
+   * via commutative `restock` adjustments (or `damage` if returned defective).
+   */
+  public async voidSaleOrder(params: {
+    orderId: string;
+    storeId: string;
+    userId: string;
+    reason: string;
+    restockAsDamaged?: boolean;
+  }): Promise<SaleOrderLocal> {
+    const existing = await this.db.orders.get(params.orderId);
+    if (!existing) {
+      throw new Error('Sale order receipt not found');
+    }
+    if (existing.notes && existing.notes.includes('[VOIDED]')) {
+      throw new Error('This receipt has already been voided/refunded.');
+    }
+
+    const now = Date.now();
+    const adjReason: AdjustmentReason = params.restockAsDamaged ? 'damage' : 'restock';
+
+    // Record stock return adjustments for each line item (only restock positive delta if not damaged)
+    if (!params.restockAsDamaged) {
+      let offset = 1;
+      for (const item of existing.items) {
+        await this.recordAdjustment({
+          productId: item.productId,
+          storeId: params.storeId,
+          delta: Math.abs(item.quantity),
+          reason: adjReason,
+          userId: params.userId,
+          now: now + offset++,
+        });
+      }
+    }
+
+    const voidTag = `[VOIDED] ${params.reason.trim() || 'Customer Refund'} (${new Date(now).toLocaleDateString()})`;
+    const updatedNotes = existing.notes ? `${existing.notes} | ${voidTag}` : voidTag;
+    const hlcNow = now + (existing.items.length || 0) + 1;
+    const orderHlc = await this.nextHlc(hlcNow);
+
+    const updatedOrder: SaleOrderLocal = {
+      ...existing,
+      notes: updatedNotes,
+      hlc: orderHlc,
+    };
+
+    const orderUpdatePayload: OrderUpdatePayload = {
+      id: updatedOrder.id,
+      storeId: updatedOrder.storeId,
+      notes: updatedOrder.notes ?? null,
+      hlc: orderHlc,
+    };
+
+    await this.db.transaction('rw', [this.db.orders, this.db.outbox], async () => {
+      await this.db.orders.put(updatedOrder);
+      await this.db.outbox.add({
+        mutationId: generateUuid(),
+        storeId: params.storeId,
+        entityId: updatedOrder.id,
+        type: 'order.update',
+        payload: orderUpdatePayload,
+        hlc: orderHlc,
+        createdAt: hlcNow,
+        attempts: 0,
+        status: 'pending',
+      });
+    });
+
+    return updatedOrder;
+  }
+
+  /**
+   * Processes an RMA Warranty Replacement on a specific hardware component in a receipt:
+   * - Deducts 1 replacement unit from inventory (`reason: 'damage'`, `delta: -1`)
+   * - Updates the receipt's recorded serial number and appends an RMA audit trail note.
+   */
+  public async processRmaReplacement(params: {
+    orderId: string;
+    storeId: string;
+    userId: string;
+    productId: string;
+    defectiveSerial: string;
+    replacementSerial: string;
+    issueDescription: string;
+  }): Promise<SaleOrderLocal> {
+    const existing = await this.db.orders.get(params.orderId);
+    if (!existing) {
+      throw new Error('Sale order receipt not found');
+    }
+    if (existing.notes && existing.notes.includes('[VOIDED]')) {
+      throw new Error('Cannot process RMA on a voided receipt.');
+    }
+
+    const targetItem = existing.items.find((i) => i.productId === params.productId);
+    if (!targetItem) {
+      throw new Error('Component not found on this receipt');
+    }
+
+    const now = Date.now();
+
+    // Deduct 1 replacement unit from good inventory as an RMA/damage write-off
+    await this.recordAdjustment({
+      productId: params.productId,
+      storeId: params.storeId,
+      delta: -1,
+      reason: 'damage',
+      userId: params.userId,
+      now,
+    });
+
+    const oldSn = params.defectiveSerial.trim() || 'UNSPECIFIED-SN';
+    const newSn = params.replacementSerial.trim() || 'NEW-RMA-SN';
+
+    const updatedItems = existing.items.map((item) => {
+      if (item.productId !== params.productId) return item;
+      const existingSerials = (item.serialNumbers || []).filter(Boolean);
+      let nextSerials: string[];
+      if (existingSerials.includes(oldSn)) {
+        nextSerials = existingSerials.map((sn) =>
+          sn === oldSn ? `${newSn} (RMA Replaced: ${oldSn})` : sn
+        );
+      } else {
+        nextSerials = [...existingSerials, `${newSn} (RMA Replaced: ${oldSn})`];
+      }
+      return {
+        ...item,
+        serialNumbers: nextSerials,
+      };
+    });
+
+    const rmaTag = `[RMA REPLACED] ${targetItem.productName}: S/N ${oldSn} -> ${newSn} (${params.issueDescription.trim() || 'Defective under warranty'} • ${new Date(now).toLocaleDateString()})`;
+    const updatedNotes = existing.notes ? `${existing.notes} | ${rmaTag}` : rmaTag;
+    const hlcNow = now + 1;
+    const orderHlc = await this.nextHlc(hlcNow);
+
+    const updatedOrder: SaleOrderLocal = {
+      ...existing,
+      items: updatedItems,
+      notes: updatedNotes,
+      hlc: orderHlc,
+    };
+
+    const orderUpdatePayload: OrderUpdatePayload = {
+      id: updatedOrder.id,
+      storeId: updatedOrder.storeId,
+      items: updatedItems,
+      notes: updatedOrder.notes ?? null,
+      hlc: orderHlc,
+    };
+
+    await this.db.transaction('rw', [this.db.orders, this.db.outbox], async () => {
+      await this.db.orders.put(updatedOrder);
+      await this.db.outbox.add({
+        mutationId: generateUuid(),
+        storeId: params.storeId,
+        entityId: updatedOrder.id,
+        type: 'order.update',
+        payload: orderUpdatePayload,
+        hlc: orderHlc,
+        createdAt: hlcNow,
+        attempts: 0,
+        status: 'pending',
+      });
+    });
+
+    return updatedOrder;
   }
 }
 
