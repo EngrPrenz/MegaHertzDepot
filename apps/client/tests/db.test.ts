@@ -264,4 +264,96 @@ describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
     expect(remainingOutbox[0].mutationId).toBe(reboundOutbox[1].mutationId);
     expect(remainingOutbox[0].status).toBe('pending');
   });
+
+  it('should reject createSaleOrder when amountTendered is less than totalAmount', async () => {
+    const cpu = await repo.createProduct({
+      storeId,
+      name: 'AMD Ryzen 5 5600',
+      sku: 'CPU-AMD-5600',
+      price: 5200,
+      initialStock: 5,
+      userId,
+    });
+
+    await expect(
+      repo.createSaleOrder({
+        storeId,
+        userId,
+        items: [
+          {
+            productId: cpu.id,
+            productName: cpu.name,
+            sku: cpu.sku,
+            category: 'CPU',
+            unitPrice: 5200,
+            quantity: 1,
+            serialNumbers: [],
+          },
+        ],
+        subtotal: 5200,
+        discountAmount: 0,
+        taxRate: 12,
+        taxInclusive: true,
+        taxAmount: 557.14,
+        totalAmount: 5200,
+        paymentMethod: 'Cash',
+        amountTendered: 0,
+        changeDue: 0,
+      })
+    ).rejects.toThrow('Amount tendered must be greater than or equal to the total amount due.');
+
+    await expect(
+      repo.createSaleOrder({
+        storeId,
+        userId,
+        items: [
+          {
+            productId: cpu.id,
+            productName: cpu.name,
+            sku: cpu.sku,
+            category: 'CPU',
+            unitPrice: 5200,
+            quantity: 1,
+            serialNumbers: [],
+          },
+        ],
+        subtotal: 5200,
+        discountAmount: 0,
+        taxRate: 12,
+        taxInclusive: true,
+        taxAmount: 557.14,
+        totalAmount: 5200,
+        paymentMethod: 'Cash',
+        amountTendered: 5199.99,
+        changeDue: 0,
+      })
+    ).rejects.toThrow('Amount tendered must be greater than or equal to the total amount due.');
+
+    const exactOrder = await repo.createSaleOrder({
+      storeId,
+      userId,
+      items: [
+        {
+          productId: cpu.id,
+          productName: cpu.name,
+          sku: cpu.sku,
+          category: 'CPU',
+          unitPrice: 5200,
+          quantity: 1,
+          serialNumbers: [],
+        },
+      ],
+      subtotal: 5200,
+      discountAmount: 0,
+      taxRate: 12,
+      taxInclusive: true,
+      taxAmount: 557.14,
+      totalAmount: 5200,
+      paymentMethod: 'Cash',
+      amountTendered: 5200,
+      changeDue: 0,
+    });
+    expect(exactOrder.amountTendered).toBe(5200);
+    expect(exactOrder.changeDue).toBe(0);
+  });
 });

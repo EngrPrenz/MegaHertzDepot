@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDb, ProductLocal } from './db/index.js';
+import { localDb } from './db/index.js';
 import { usePersistentStorage } from './hooks/usePersistentStorage.js';
 import { useSyncEngine } from './hooks/useSyncEngine.js';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.js';
@@ -19,7 +19,6 @@ import { ModalDialog } from './components/ModalDialog.js';
 import { MegaHertzLogo } from './components/MegaHertzLogo.js';
 import {
   ShoppingCart,
-  Wrench,
   Receipt,
   Database,
   Layers,
@@ -29,7 +28,6 @@ import {
   Settings,
   AlertTriangle,
   Store,
-  ShieldCheck,
   Globe,
   ChevronLeft,
   ChevronRight,
@@ -154,7 +152,6 @@ export function App() {
   const [externalCart, setExternalCart] = useState<CartItem[]>([]);
   const [activeProductId, setActiveProductId] = useState<string | null>(() => getProductIdFromRoute());
   const [isCustomerBuilderOpen, setIsCustomerBuilderOpen] = useState(false);
-  const [isPosBuilderOpen, setIsPosBuilderOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Admin Left Sidebar State (persisted collapse preference + mobile drawer state)
@@ -400,18 +397,6 @@ export function App() {
     localStorage.setItem('megahertz_currency', sym);
   };
 
-  const handleLoadBuildToPosCart = (parts: ProductLocal[]) => {
-    const nextCart: CartItem[] = parts.map((product) => ({
-      product,
-      quantity: 1,
-      serialNumbers: [''],
-      showSerialInput: false,
-    }));
-    setExternalCart(nextCart);
-    setIsPosBuilderOpen(false);
-    navigateToPos();
-  };
-
   const activeStoreName =
     stores.find((s) => s.id === storeId)?.name || 'MegaHertz Depot — Flagship';
 
@@ -556,34 +541,6 @@ export function App() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-2.5">
-              <button
-                type="button"
-                onClick={() => setIsPosBuilderOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-950 border border-stone-800 text-xs font-semibold text-stone-200 hover:border-amber-500/40 hover:text-amber-300 transition cursor-pointer"
-              >
-                <Wrench className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">PC Rig Builder</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigateToAdmin()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-xs font-semibold text-stone-300 hover:text-white hover:bg-stone-800 transition cursor-pointer"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">Admin Portal</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={navigateToStorefront}
-                title="View Public Customer Storefront"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900 border border-stone-800 text-xs text-stone-300 hover:text-white hover:bg-stone-800 transition cursor-pointer"
-              >
-                <Globe className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden md:inline">Storefront</span>
-              </button>
-
               <SyncStatusIndicator
                 isOnline={isOnline}
                 status={syncStatus}
@@ -644,24 +601,6 @@ export function App() {
             setExternalCart={setExternalCart}
           />
         </main>
-
-        {/* POS Custom PC Rig Builder Modal */}
-        <ModalDialog
-          open={isPosBuilderOpen}
-          onClose={() => setIsPosBuilderOpen(false)}
-          title="POS Custom PC Rig Builder"
-          subtitle="Select compatible parts and load them directly into the POS Register cart"
-          maxWidth="6xl"
-        >
-          <div className="max-h-[82vh] overflow-y-auto pr-1">
-            <PcBuilderPage
-              storeId={storeId}
-              storeName={activeStoreName}
-              currencySymbol={currencySymbol}
-              onLoadBuildToCart={handleLoadBuildToPosCart}
-            />
-          </div>
-        </ModalDialog>
 
         {/* Terminal & Branch Settings Modal */}
         <ModalDialog

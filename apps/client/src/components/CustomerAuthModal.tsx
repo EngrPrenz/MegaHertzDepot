@@ -42,6 +42,10 @@ export function CustomerAuthModal({
         setError('Please provide your name and email address for order updates.');
         return;
       }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        setError('Please enter a valid email address (e.g. juan@example.com).');
+        return;
+      }
       const guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const guestUser: CustomerUser = {
         id: guestId,

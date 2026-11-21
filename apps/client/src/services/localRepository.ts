@@ -506,6 +506,14 @@ export class LocalFirstRepository {
     notes?: string;
     now?: number;
   }): Promise<SaleOrderLocal> {
+    if (
+      !Number.isFinite(params.amountTendered) ||
+      params.amountTendered < 0 ||
+      Math.round(params.amountTendered * 100) < Math.round(params.totalAmount * 100)
+    ) {
+      throw new Error('Amount tendered must be greater than or equal to the total amount due.');
+    }
+
     const now = params.now ?? Date.now();
     const deviceId = await this.getDeviceId();
     const orderHlc = await this.nextHlc(now);

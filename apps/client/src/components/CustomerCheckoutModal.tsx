@@ -15,6 +15,9 @@ import {
   Printer,
 } from 'lucide-react';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface StorefrontCartItem {
   product: ProductLocal;
   quantity: number;
@@ -109,13 +112,19 @@ export function CustomerCheckoutModal({
       // Prefer authoritative server checkout when online so pricing/stock are enforced centrally
       if (navigator.onLine) {
         try {
+          const validEmail =
+            customer.email && EMAIL_REGEX.test(customer.email.trim())
+              ? customer.email.trim()
+              : undefined;
+          const validStoreId = UUID_REGEX.test(storeId) ? storeId : undefined;
+
           const response = await fetch('/public/orders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              storeId,
+              storeId: validStoreId,
               customerName: customer.name || customer.email.split('@')[0],
-              customerEmail: customer.email?.includes('@') ? customer.email : undefined,
+              customerEmail: validEmail,
               customerPhone: phone.trim() || undefined,
               fulfillment,
               address: address.trim() || undefined,
@@ -160,7 +169,16 @@ export function CustomerCheckoutModal({
             return;
           }
           if (response.status >= 400 && response.status < 500) {
-            throw new Error(data?.error || 'Order could not be placed.');
+            const firstIssue =
+              Array.isArray(data?.details) && data.details.length > 0 ? data.details[0] : null;
+            const detailMsg = firstIssue
+              ? `${data?.error || 'Validation error'}: ${
+                  Array.isArray(firstIssue.path) && firstIssue.path.length > 0
+                    ? `${firstIssue.path.join('.')} — `
+                    : ''
+                }${firstIssue.message}`
+              : data?.error || 'Order could not be placed.';
+            throw new Error(detailMsg);
           }
         } catch (err: any) {
           if (

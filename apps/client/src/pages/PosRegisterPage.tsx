@@ -65,6 +65,7 @@ export function PosRegisterPage({
   const [taxInclusive, setTaxInclusive] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
   const [amountTenderedInput, setAmountTenderedInput] = useState('');
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [completedOrder, setCompletedOrder] = useState<SaleOrderLocal | null>(null);
   const [seeding, setSeeding] = useState(false);
 
@@ -225,46 +226,90 @@ export function PosRegisterPage({
 
   const totalAmount = taxInclusive ? netAfterDiscount : netAfterDiscount + taxAmount;
 
+  const trimmedTendered = amountTenderedInput.trim();
+  const hasTenderedInput = trimmedTendered !== '';
+  const parsedTendered = hasTenderedInput ? Number(trimmedTendered) : NaN;
+  const isTenderedValidNumber = Number.isFinite(parsedTendered) && parsedTendered >= 0;
+  const totalCents = Math.round(totalAmount * 100);
+  const tenderedCents = isTenderedValidNumber ? Math.round(parsedTendered * 100) : 0;
+
+  const isTenderMissing = cart.length > 0 && totalCents > 0 && !hasTenderedInput;
+  const isTenderInsufficient =
+    cart.length > 0 &&
+    totalCents > 0 &&
+    hasTenderedInput &&
+    (!isTenderedValidNumber || tenderedCents < totalCents);
+  const shortfallAmount =
+    isTenderInsufficient && isTenderedValidNumber
+      ? Math.round((totalAmount - parsedTendered) * 100) / 100
+      : totalAmount;
+  const canCompleteSale =
+    cart.length > 0 &&
+    !isTenderMissing &&
+    !isTenderInsufficient &&
+    (totalCents === 0 || isTenderedValidNumber);
+
   const amountTendered =
-    amountTenderedInput !== '' ? parseFloat(amountTenderedInput) || 0 : totalAmount;
-  const changeDue = Math.max(0, amountTendered - totalAmount);
+    hasTenderedInput && isTenderedValidNumber ? Math.round(parsedTendered * 100) / 100 : 0;
+  const changeDue =
+    hasTenderedInput && isTenderedValidNumber && tenderedCents >= totalCents
+      ? Math.round((parsedTendered - totalAmount) * 100) / 100
+      : 0;
 
   const handleCompleteSale = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
 
-    const order = await localRepository.createSaleOrder({
-      storeId,
-      userId,
-      customerName,
-      customerPhone,
-      items: cart.map((c) => ({
-        productId: c.product.id,
-        productName: c.product.name,
-        sku: c.product.sku ?? null,
-        category: c.product.category ?? 'Peripheral',
-        warranty: c.product.warranty ?? '1 Year Store Warranty',
-        quantity: c.quantity,
-        unitPrice: c.product.price ?? 0,
-        serialNumbers: c.serialNumbers.map((s) => s.trim()).filter(Boolean),
-      })),
-      subtotal,
-      discountAmount,
-      taxRate,
-      taxInclusive,
-      taxAmount,
-      totalAmount,
-      paymentMethod,
-      amountTendered: Math.max(totalAmount, amountTendered),
-      changeDue,
-    });
+    if (isTenderMissing) {
+      setCheckoutError('Please enter the amount tendered before completing checkout.');
+      return;
+    }
 
-    setCart([]);
-    setCustomerName('');
-    setCustomerPhone('');
-    setDiscountInput('0');
-    setAmountTenderedInput('');
-    setCompletedOrder(order);
+    if (isTenderInsufficient || (totalCents > 0 && !isTenderedValidNumber)) {
+      setCheckoutError(
+        `Insufficient payment: short by ${formatCurrency(shortfallAmount, currencySymbol)}.`
+      );
+      return;
+    }
+
+    setCheckoutError(null);
+
+    try {
+      const order = await localRepository.createSaleOrder({
+        storeId,
+        userId,
+        customerName,
+        customerPhone,
+        items: cart.map((c) => ({
+          productId: c.product.id,
+          productName: c.product.name,
+          sku: c.product.sku ?? null,
+          category: c.product.category ?? 'Peripheral',
+          warranty: c.product.warranty ?? '1 Year Store Warranty',
+          quantity: c.quantity,
+          unitPrice: c.product.price ?? 0,
+          serialNumbers: c.serialNumbers.map((s) => s.trim()).filter(Boolean),
+        })),
+        subtotal,
+        discountAmount,
+        taxRate,
+        taxInclusive,
+        taxAmount,
+        totalAmount,
+        paymentMethod,
+        amountTendered,
+        changeDue,
+      });
+
+      setCart([]);
+      setCustomerName('');
+      setCustomerPhone('');
+      setDiscountInput('0');
+      setAmountTenderedInput('');
+      setCompletedOrder(order);
+    } catch (err: any) {
+      setCheckoutError(err?.message || 'Unable to complete checkout.');
+    }
   };
 
   // Barcode / Quick-SKU Ring-Up Handler
@@ -786,15 +831,50 @@ export function PosRegisterPage({
                 </strong>
               </span>
             </div>
-            <input
-              type="number"
-              min={0}
-              step="any"
-              value={amountTenderedInput}
-              onChange={(e) => setAmountTenderedInput(e.target.value)}
-              placeholder={String(totalAmount)}
-              className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-1.5 text-sm font-bold font-mono text-white focus:outline-none focus:border-amber-500"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                step="any"
+                value={amountTenderedInput}
+                onChange={(e) => {
+                  setAmountTenderedInput(e.target.value);
+                  if (checkoutError) setCheckoutError(null);
+                }}
+                placeholder="Enter amount tendered..."
+                data-testid="amount-tendered-input"
+                className={`w-full bg-stone-950 border rounded-xl px-3 py-1.5 text-sm font-bold font-mono text-white focus:outline-none ${
+                  isTenderInsufficient
+                    ? 'border-rose-500 focus:border-rose-400'
+                    : 'border-stone-800 focus:border-amber-500'
+                }`}
+              />
+              <button
+                type="button"
+                disabled={cart.length === 0}
+                onClick={() => {
+                  setAmountTenderedInput(totalAmount > 0 ? totalAmount.toFixed(2) : '0');
+                  setCheckoutError(null);
+                }}
+                data-testid="exact-tender-btn"
+                className="px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-amber-300 text-xs font-bold shrink-0 cursor-pointer transition-colors"
+              >
+                Exact
+              </button>
+            </div>
+            {(isTenderInsufficient || checkoutError) && (
+              <p
+                data-testid="pos-checkout-error"
+                className="mt-1.5 text-[11px] text-rose-400 flex items-center gap-1"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  {isTenderInsufficient
+                    ? `Insufficient amount: short by ${formatCurrency(shortfallAmount, currencySymbol)}`
+                    : checkoutError}
+                </span>
+              </p>
+            )}
           </div>
 
           {/* Price Breakdown Box */}
@@ -823,9 +903,9 @@ export function PosRegisterPage({
 
           <button
             type="submit"
-            disabled={cart.length === 0}
+            disabled={!canCompleteSale}
             data-testid="complete-sale-btn"
-            className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-amber-950/40 cursor-pointer transition-all active:scale-[0.99]"
+            className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-stone-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-amber-950/40 cursor-pointer transition-all active:scale-[0.99]"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>Complete Checkout & Issue Official Receipt</span>
