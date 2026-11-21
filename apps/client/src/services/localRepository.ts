@@ -699,12 +699,88 @@ export class LocalFirstRepository {
     await this.db.outbox.delete(mutationId);
   }
 
-  public async retryRejectedMutation(mutationId: string): Promise<void> {
+  public async dismissAllRejectedMutations(): Promise<number> {
+    const rejected = await this.db.outbox.filter((m) => m.status === 'rejected').toArray();
+    if (rejected.length === 0) return 0;
+    await this.db.outbox.bulkDelete(rejected.map((m) => m.mutationId));
+    return rejected.length;
+  }
+
+  public async retryRejectedMutation(mutationId: string, targetStoreId?: string): Promise<void> {
+    const existing = await this.db.outbox.get(mutationId);
+    if (!existing) return;
+
+    const nextPayload =
+      targetStoreId &&
+      existing.payload &&
+      typeof existing.payload === 'object' &&
+      'storeId' in existing.payload
+        ? { ...existing.payload, storeId: targetStoreId }
+        : existing.payload;
+
     await this.db.outbox.update(mutationId, {
+      ...(targetStoreId ? { storeId: targetStoreId, payload: nextPayload } : {}),
       status: 'pending',
       attempts: 0,
       lastError: undefined,
     });
+  }
+
+  public async retryAllRejectedMutations(targetStoreId?: string): Promise<number> {
+    const rejected = await this.db.outbox.filter((m) => m.status === 'rejected').toArray();
+    if (rejected.length === 0) return 0;
+
+    const oldStoreIds = Array.from(
+      new Set(
+        rejected
+          .map((m) => m.storeId)
+          .filter((id): id is string => Boolean(id) && Boolean(targetStoreId) && id !== targetStoreId)
+      )
+    );
+
+    await this.db.transaction(
+      'rw',
+      [this.db.products, this.db.adjustments, this.db.orders, this.db.outbox],
+      async () => {
+        if (targetStoreId && oldStoreIds.length > 0) {
+          for (const oldId of oldStoreIds) {
+            await this.db.products
+              .where('storeId')
+              .equals(oldId)
+              .modify({ storeId: targetStoreId });
+            await this.db.adjustments
+              .where('storeId')
+              .equals(oldId)
+              .modify({ storeId: targetStoreId });
+            await this.db.orders
+              .where('storeId')
+              .equals(oldId)
+              .modify({ storeId: targetStoreId });
+          }
+        }
+
+        for (const item of rejected) {
+          const nextPayload =
+            targetStoreId &&
+            item.payload &&
+            typeof item.payload === 'object' &&
+            'storeId' in item.payload
+              ? { ...item.payload, storeId: targetStoreId }
+              : item.payload;
+
+          await this.db.outbox.put({
+            ...item,
+            storeId: targetStoreId || item.storeId,
+            payload: nextPayload,
+            status: 'pending',
+            attempts: 0,
+            lastError: undefined,
+          });
+        }
+      }
+    );
+
+    return rejected.length;
   }
 
   /**

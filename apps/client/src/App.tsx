@@ -94,6 +94,46 @@ function safeJsonParse<T>(raw: string | null, fallback: T): T {
 
 const DEFAULT_STORE_FALLBACK = '22222222-2222-2222-2222-222222222222';
 
+async function migrateFallbackStoreData(targetStoreId: string): Promise<void> {
+  if (!targetStoreId || targetStoreId === DEFAULT_STORE_FALLBACK) return;
+  try {
+    await localDb.transaction(
+      'rw',
+      [localDb.products, localDb.adjustments, localDb.orders, localDb.outbox],
+      async () => {
+        await localDb.products
+          .where('storeId')
+          .equals(DEFAULT_STORE_FALLBACK)
+          .modify({ storeId: targetStoreId });
+        await localDb.adjustments
+          .where('storeId')
+          .equals(DEFAULT_STORE_FALLBACK)
+          .modify({ storeId: targetStoreId });
+        await localDb.orders
+          .where('storeId')
+          .equals(DEFAULT_STORE_FALLBACK)
+          .modify({ storeId: targetStoreId });
+        await localDb.outbox
+          .where('storeId')
+          .equals(DEFAULT_STORE_FALLBACK)
+          .modify((m) => {
+            m.storeId = targetStoreId;
+            if (m.payload && typeof m.payload === 'object' && 'storeId' in m.payload) {
+              m.payload.storeId = targetStoreId;
+            }
+            if (m.status === 'rejected' && m.lastError?.includes('does not belong to target store')) {
+              m.status = 'pending';
+              m.attempts = 0;
+              m.lastError = undefined;
+            }
+          });
+      }
+    );
+  } catch {
+    // Ignore migration failure
+  }
+}
+
 type AdminTab = 'sales' | 'inventory' | 'quick-count' | 'sync';
 
 export function App() {
@@ -143,6 +183,17 @@ export function App() {
   const [stores, setStores] = useState<Array<{ id: string; name: string; role?: string }>>(() => [
     { id: storeId, name: 'MegaHertz Depot — Flagship' },
   ]);
+  const [verifiedStoreIds, setVerifiedStoreIds] = useState<string[]>([]);
+
+  const syncTargetStoreId =
+    token &&
+    token !== 'offline_demo_token' &&
+    user?.role !== 'customer' &&
+    storeId &&
+    storeId !== DEFAULT_STORE_FALLBACK &&
+    verifiedStoreIds.includes(storeId)
+      ? storeId
+      : null;
 
   const {
     status: syncStatus,
@@ -150,7 +201,7 @@ export function App() {
     pendingOutboxCount,
     rejectedOutboxCount,
     triggerSync,
-  } = useSyncEngine(token && user?.role !== 'customer' ? storeId : null);
+  } = useSyncEngine(syncTargetStoreId);
 
   // Listen for browser navigation changes (e.g. forward/back to /pos, /admin, or /product/:id)
   useEffect(() => {
@@ -200,59 +251,36 @@ export function App() {
     if (!token || token === 'offline_demo_token' || user?.role === 'customer' || !isOnline) {
       return;
     }
+    let cancelled = false;
     fetch('/stores', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : null))
       .then(async (data) => {
-        if (data?.stores?.length) {
-          setStores(data.stores);
-          let activeId = storeId;
-          if (!data.stores.some((s: any) => s.id === storeId)) {
-            activeId = data.stores[0].id;
-            setStoreId(activeId);
-            localStorage.setItem('countwise_store_id', activeId);
-          }
-          // Ensure any products/adjustments/orders/outbox created under DEFAULT_STORE_FALLBACK belong to activeId
-          if (activeId !== DEFAULT_STORE_FALLBACK) {
-            try {
-              await localDb.transaction(
-                'rw',
-                [localDb.products, localDb.adjustments, localDb.orders, localDb.outbox],
-                async () => {
-                  await localDb.products
-                    .where('storeId')
-                    .equals(DEFAULT_STORE_FALLBACK)
-                    .modify({ storeId: activeId });
-                  await localDb.adjustments
-                    .where('storeId')
-                    .equals(DEFAULT_STORE_FALLBACK)
-                    .modify({ storeId: activeId });
-                  await localDb.orders
-                    .where('storeId')
-                    .equals(DEFAULT_STORE_FALLBACK)
-                    .modify({ storeId: activeId });
-                  await localDb.outbox
-                    .where('storeId')
-                    .equals(DEFAULT_STORE_FALLBACK)
-                    .modify((m) => {
-                      m.storeId = activeId;
-                      if (m.payload && typeof m.payload === 'object' && 'storeId' in m.payload) {
-                        m.payload.storeId = activeId;
-                      }
-                    });
-                }
-              );
-            } catch {
-              // Ignore migration failure
-            }
-          }
+        if (cancelled || !data?.stores?.length) return;
+        const serverIds: string[] = data.stores.map((s: any) => s.id);
+        setStores(data.stores);
+
+        const currentId = localStorage.getItem('countwise_store_id') || storeId;
+        let activeId = currentId;
+        if (!serverIds.includes(currentId)) {
+          activeId = data.stores[0].id;
+          localStorage.setItem('countwise_store_id', activeId);
+          setStoreId(activeId);
+        }
+
+        await migrateFallbackStoreData(activeId);
+        if (!cancelled) {
+          setVerifiedStoreIds(serverIds);
         }
       })
       .catch(() => {
         // Offline or unreachable; keep cached store list
       });
-  }, [token, user?.role, isOnline, storeId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.role, isOnline]);
 
   // Live queries from Dexie for current store
   const activeProductCount = useLiveQuery(
@@ -289,8 +317,11 @@ export function App() {
     localStorage.removeItem('countwise_token');
     localStorage.removeItem('countwise_refresh_token');
     localStorage.removeItem('countwise_user');
+    localStorage.removeItem('countwise_store_id');
     setToken(null);
     setUser(null);
+    setStoreId(DEFAULT_STORE_FALLBACK);
+    setVerifiedStoreIds([]);
   };
 
   const handleResolvePublicStoreId = useCallback(
@@ -308,47 +339,25 @@ export function App() {
     user: { id: string; email: string; role?: 'staff' | 'customer' };
     defaultStoreId?: string;
   }) => {
-    setToken(data.accessToken);
-    setUser(data.user);
-    if (data.defaultStoreId) {
-      const targetStoreId = data.defaultStoreId;
-      // Migrate any data created in Offline Demo Mode (DEFAULT_STORE_FALLBACK) to the real authenticated storeId
-      if (targetStoreId !== DEFAULT_STORE_FALLBACK) {
-        try {
-          await localDb.transaction(
-            'rw',
-            [localDb.products, localDb.adjustments, localDb.orders, localDb.outbox],
-            async () => {
-              await localDb.products
-                .where('storeId')
-                .equals(DEFAULT_STORE_FALLBACK)
-                .modify({ storeId: targetStoreId });
-              await localDb.adjustments
-                .where('storeId')
-                .equals(DEFAULT_STORE_FALLBACK)
-                .modify({ storeId: targetStoreId });
-              await localDb.orders
-                .where('storeId')
-                .equals(DEFAULT_STORE_FALLBACK)
-                .modify({ storeId: targetStoreId });
-              await localDb.outbox
-                .where('storeId')
-                .equals(DEFAULT_STORE_FALLBACK)
-                .modify((m) => {
-                  m.storeId = targetStoreId;
-                  if (m.payload && typeof m.payload === 'object' && 'storeId' in m.payload) {
-                    m.payload.storeId = targetStoreId;
-                  }
-                });
-            }
-          );
-        } catch {
-          // Ignore migration failure
-        }
-      }
-      setStoreId(targetStoreId);
-      localStorage.setItem('countwise_store_id', targetStoreId);
+    if (data.accessToken === 'offline_demo_token') {
+      setVerifiedStoreIds([]);
+      setStoreId(data.defaultStoreId || DEFAULT_STORE_FALLBACK);
+      setUser(data.user);
+      setToken(data.accessToken);
+      return;
     }
+
+    if (data.defaultStoreId) {
+      await migrateFallbackStoreData(data.defaultStoreId);
+      localStorage.setItem('countwise_store_id', data.defaultStoreId);
+      setStoreId(data.defaultStoreId);
+      setVerifiedStoreIds((prev) =>
+        prev.includes(data.defaultStoreId!) ? prev : [...prev, data.defaultStoreId!]
+      );
+    }
+
+    setUser(data.user);
+    setToken(data.accessToken);
   };
 
   const handleSelectStore = (nextStoreId: string) => {
@@ -369,6 +378,9 @@ export function App() {
       if (res.ok) {
         const data = await res.json();
         setStores((prev) => [...prev, data.store]);
+        setVerifiedStoreIds((prev) =>
+          prev.includes(data.store.id) ? prev : [...prev, data.store.id]
+        );
         handleSelectStore(data.store.id);
         return;
       }

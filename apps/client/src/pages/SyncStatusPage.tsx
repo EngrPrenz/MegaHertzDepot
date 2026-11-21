@@ -143,11 +143,35 @@ export function SyncStatusPage({
       {/* Stretch Goal: Conflict / Rejected Mutation Review UI */}
       {rejectedItems.length > 0 && (
         <div className="glass-panel p-5 rounded-2xl border border-amber-700/50 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-bold text-amber-300 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-400" />
               <span>Conflict & Rejected Mutation Review ({rejectedItems.length})</span>
             </h3>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  await localRepository.retryAllRejectedMutations(storeId);
+                  await onManualSync();
+                }}
+                disabled={!isOnline || status.state === 'syncing'}
+                data-testid="retry-all-rejected-btn"
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Retry All ({rejectedItems.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => localRepository.dismissAllRejectedMutations()}
+                data-testid="dismiss-all-rejected-btn"
+                className="px-3 py-1.5 rounded-lg bg-red-950/70 hover:bg-red-900/70 border border-red-800/60 text-red-200 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Dismiss All</span>
+              </button>
+            </div>
           </div>
           <p className="text-xs text-slate-400">
             These mutations could not be automatically applied by the server. You can retry or
@@ -173,7 +197,10 @@ export function SyncStatusPage({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => localRepository.retryRejectedMutation(item.mutationId)}
+                    onClick={async () => {
+                      await localRepository.retryRejectedMutation(item.mutationId, storeId);
+                      await onManualSync();
+                    }}
                     className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 inline-flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />

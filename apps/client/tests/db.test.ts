@@ -207,4 +207,61 @@ describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
     expect(savedOrders).toHaveLength(1);
     expect(savedOrders[0].items[0].serialNumbers).toEqual(['SN-7800-A1', 'SN-7800-A2']);
   });
+
+  it('should rebind storeId on retryAllRejectedMutations and clear rejected items on dismissAllRejectedMutations', async () => {
+    const wrongStoreId = '22222222-2222-2222-2222-222222222222';
+    const realStoreId = '33333333-3333-4333-8333-333333333333';
+
+    const created = await repo.createProduct({
+      storeId: wrongStoreId,
+      name: 'RTX 4070 Super',
+      sku: 'GPU-NV-4070S',
+      initialStock: 5,
+      userId,
+    });
+
+    // Simulate server rejecting those 2 outbox items due to store mismatch
+    const initialOutbox = await db.outbox.toArray();
+    expect(initialOutbox).toHaveLength(2);
+    for (const item of initialOutbox) {
+      await db.outbox.update(item.mutationId, {
+        status: 'rejected',
+        attempts: 1,
+        lastError: 'Forbidden: user does not belong to target store',
+      });
+    }
+
+    const retriedCount = await repo.retryAllRejectedMutations(realStoreId);
+    expect(retriedCount).toBe(2);
+
+    const reboundProduct = await db.products.get(created.id);
+    expect(reboundProduct?.storeId).toBe(realStoreId);
+
+    const reboundAdjustments = await db.adjustments.where('productId').equals(created.id).toArray();
+    expect(reboundAdjustments.every((a) => a.storeId === realStoreId)).toBe(true);
+
+    const reboundOutbox = await db.outbox.toArray();
+    expect(reboundOutbox).toHaveLength(2);
+    for (const m of reboundOutbox) {
+      expect(m.storeId).toBe(realStoreId);
+      expect(m.payload.storeId).toBe(realStoreId);
+      expect(m.status).toBe('pending');
+      expect(m.attempts).toBe(0);
+      expect(m.lastError).toBeUndefined();
+    }
+
+    // Mark 1 rejected and leave 1 pending, then dismissAllRejectedMutations
+    await db.outbox.update(reboundOutbox[0].mutationId, {
+      status: 'rejected',
+      lastError: 'Some error',
+    });
+
+    const dismissedCount = await repo.dismissAllRejectedMutations();
+    expect(dismissedCount).toBe(1);
+
+    const remainingOutbox = await db.outbox.toArray();
+    expect(remainingOutbox).toHaveLength(1);
+    expect(remainingOutbox[0].mutationId).toBe(reboundOutbox[1].mutationId);
+    expect(remainingOutbox[0].status).toBe('pending');
+  });
 });
