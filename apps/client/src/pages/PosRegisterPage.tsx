@@ -8,7 +8,6 @@ import {
   HARDWARE_CATEGORIES,
   HardwareCategory,
   PaymentMethod,
-  SAMPLE_PC_HARDWARE_CATALOG,
   formatCurrency,
 } from '@countwise/shared';
 import {
@@ -386,17 +385,16 @@ export function PosRegisterPage({
             type="button"
             onClick={() => setScannerMode((v) => !v)}
             title="Toggle USB / Keyboard-Wedge Barcode Scanner Listener"
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer shrink-0 ${
-              scannerMode
-                ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
-                : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-white'
-            }`}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer shrink-0 ${scannerMode
+              ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
+              : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-white'
+              }`}
           >
             <Barcode className="w-4 h-4 text-amber-400" />
             <span>{scannerMode ? 'Scanner Active' : 'Scanner Paused'}</span>
           </button>
 
-          {products.length < SAMPLE_PC_HARDWARE_CATALOG.length && (
+          {products.length === 0 && (
             <button
               type="button"
               onClick={handleSeedCatalog}
@@ -405,13 +403,7 @@ export function PosRegisterPage({
               className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-950/40 cursor-pointer shrink-0"
             >
               <Sparkles className="w-4 h-4" />
-              <span>
-                {seeding
-                  ? 'Seeding...'
-                  : products.length === 0
-                  ? 'Seed Sample PC Hardware'
-                  : `Seed Missing Hardware (+${SAMPLE_PC_HARDWARE_CATALOG.length - products.length})`}
-              </span>
+              <span>{seeding ? 'Seeding...' : 'Seed Sample PC Hardware'}</span>
             </button>
           )}
         </div>
@@ -419,11 +411,10 @@ export function PosRegisterPage({
         {/* Live Barcode Scan Feedback Banner */}
         {scanFeedback && (
           <div
-            className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
-              scanFeedback.type === 'success'
-                ? 'bg-emerald-950/60 border-emerald-700/70 text-emerald-200'
-                : 'bg-amber-950/60 border-amber-700/70 text-amber-200'
-            }`}
+            className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 ${scanFeedback.type === 'success'
+              ? 'bg-emerald-950/60 border-emerald-700/70 text-emerald-200'
+              : 'bg-amber-950/60 border-amber-700/70 text-amber-200'
+              }`}
           >
             {scanFeedback.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -439,11 +430,10 @@ export function PosRegisterPage({
           <button
             type="button"
             onClick={() => setSelectedCategory('All')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
-              selectedCategory === 'All'
-                ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
-            }`}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors cursor-pointer ${selectedCategory === 'All'
+              ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
+              : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
+              }`}
           >
             All Parts ({products.length})
           </button>
@@ -452,11 +442,10 @@ export function PosRegisterPage({
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
-                selectedCategory === cat
-                  ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                  : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
-              }`}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors cursor-pointer ${selectedCategory === cat
+                ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
+                : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
+                }`}
             >
               {cat}
             </button>
@@ -474,10 +463,9 @@ export function PosRegisterPage({
                 Welcome to MegaHertz Depot POS
               </h3>
               <p className="text-xs text-stone-400 leading-relaxed">
-                Load our curated 142-item PC Hardware &amp; Laptop Catalog (Ryzen 7000/9000 &amp; Intel Core
-                14th Gen / Ultra, RTX 40/50 &amp; RX 7000/9000 GPUs, AM5/AM4/LGA1700/LGA1851 Motherboards,
-                DDR5/DDR4 RAM, NVMe SSDs, PSUs, Cases, Cooling, Monitors, Peripherals &amp; Laptops) to test
-                offline POS checkout and PC Rig building immediately.
+                Load our curated 14-item PC Hardware Catalog (Ryzen 7 7800X3D, Core i5-14600K, RTX
+                4070 Super, AM5 & LGA1700 Motherboards, DDR5/DDR4 RAM, NVMe SSD, PSU, Case &
+                Peripherals) to test offline POS checkout and PC Rig building immediately.
               </p>
             </div>
             <button
@@ -488,7 +476,7 @@ export function PosRegisterPage({
               className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-lg shadow-amber-950/40 cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Seed Sample PC Hardware Catalog (142 Items)</span>
+              <span>Seed Sample PC Hardware Catalog (14 Items)</span>
             </button>
           </div>
         ) : (
@@ -517,13 +505,12 @@ export function PosRegisterPage({
                           {product.category || 'Hardware'}
                         </span>
                         <span
-                          className={`text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded-full shrink-0 ${
-                            isOversold
-                              ? 'bg-red-950/80 text-red-300 border border-red-800'
-                              : isLowStock
+                          className={`text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded-full shrink-0 ${isOversold
+                            ? 'bg-red-950/80 text-red-300 border border-red-800'
+                            : isLowStock
                               ? 'bg-amber-950/80 text-amber-300 border border-amber-800'
                               : 'bg-stone-950 text-stone-300 border border-stone-800'
-                          }`}
+                            }`}
                         >
                           {isOversold ? `Oversold (${stock})` : `${stock} in stock`}
                         </span>
@@ -725,18 +712,16 @@ export function PosRegisterPage({
                   <button
                     type="button"
                     onClick={() => setDiscountType('fixed')}
-                    className={`px-2 py-0.5 rounded cursor-pointer ${
-                      discountType === 'fixed' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-400'
-                    }`}
+                    className={`px-2 py-0.5 rounded cursor-pointer ${discountType === 'fixed' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-400'
+                      }`}
                   >
                     {currencySymbol}
                   </button>
                   <button
                     type="button"
                     onClick={() => setDiscountType('percent')}
-                    className={`px-2 py-0.5 rounded cursor-pointer ${
-                      discountType === 'percent' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-400'
-                    }`}
+                    className={`px-2 py-0.5 rounded cursor-pointer ${discountType === 'percent' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-400'
+                      }`}
                   >
                     %
                   </button>
@@ -772,11 +757,10 @@ export function PosRegisterPage({
                   key={method}
                   type="button"
                   onClick={() => setPaymentMethod(method)}
-                  className={`py-2 rounded-xl text-[11px] font-semibold border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    paymentMethod === method
-                      ? 'bg-amber-500 text-stone-950 font-bold shadow-sm border-amber-500'
-                      : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-white hover:border-stone-700'
-                  }`}
+                  className={`py-2 rounded-xl text-[11px] font-semibold border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${paymentMethod === method
+                    ? 'bg-amber-500 text-stone-950 font-bold shadow-sm border-amber-500'
+                    : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-white hover:border-stone-700'
+                    }`}
                 >
                   {method === 'Cash' ? (
                     <Banknote className="w-3.5 h-3.5" />
