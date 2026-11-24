@@ -688,6 +688,7 @@ export function InventoryPage({
                   <div className="flex items-center gap-3.5 min-w-0 flex-1">
                     <ProductImage
                       imageUrl={item.product.imageUrl}
+                      sku={item.product.sku}
                       name={item.product.name}
                       category={item.product.category}
                       className="w-12 h-12 rounded-xl shrink-0"
@@ -830,6 +831,7 @@ export function InventoryPage({
               <div className="flex items-start gap-3.5 min-w-0 flex-1">
                 <ProductImage
                   imageUrl={selectedItem.product.imageUrl}
+                  sku={selectedItem.product.sku}
                   name={selectedItem.product.name}
                   category={selectedItem.product.category}
                   className="w-16 h-16 rounded-xl shrink-0"

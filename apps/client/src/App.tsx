@@ -3,6 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from './db/index.js';
 import { usePersistentStorage } from './hooks/usePersistentStorage.js';
 import { useSyncEngine } from './hooks/useSyncEngine.js';
+import {
+  syncPublicCatalog,
+  PUBLIC_CATALOG_REFRESH_EVENT,
+  DEFAULT_STORE_FALLBACK,
+} from './services/publicCatalogSync.js';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.js';
 import { ReloadPrompt } from './components/ReloadPrompt.js';
 import { AuthPage } from './pages/AuthPage.js';
@@ -89,8 +94,6 @@ function safeJsonParse<T>(raw: string | null, fallback: T): T {
     return fallback;
   }
 }
-
-const DEFAULT_STORE_FALLBACK = '22222222-2222-2222-2222-222222222222';
 
 async function migrateFallbackStoreData(targetStoreId: string): Promise<void> {
   if (!targetStoreId || targetStoreId === DEFAULT_STORE_FALLBACK) return;
@@ -323,13 +326,39 @@ export function App() {
 
   const handleResolvePublicStoreId = useCallback(
     (resolvedId: string) => {
-      if (!token && storeId === DEFAULT_STORE_FALLBACK && resolvedId) {
+      if (!token && resolvedId && resolvedId !== storeId) {
         setStoreId(resolvedId);
         localStorage.setItem('countwise_store_id', resolvedId);
       }
     },
     [token, storeId]
   );
+
+  // Sync public storefront catalog + stock whenever viewing storefront routes
+  useEffect(() => {
+    if (routeMode !== 'storefront') return;
+    let cancelled = false;
+
+    const runSync = () => {
+      if (cancelled) return;
+      void syncPublicCatalog(storeId, {
+        allowAutoResolve: !token,
+        onResolvePublicStoreId: (resolvedId) => {
+          if (!cancelled) handleResolvePublicStoreId(resolvedId);
+        },
+      });
+    };
+
+    runSync();
+    window.addEventListener('online', runSync);
+    window.addEventListener(PUBLIC_CATALOG_REFRESH_EVENT, runSync);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', runSync);
+      window.removeEventListener(PUBLIC_CATALOG_REFRESH_EVENT, runSync);
+    };
+  }, [routeMode, storeId, token, handleResolvePublicStoreId]);
 
   const handleAuthSuccess = async (data: {
     accessToken: string;

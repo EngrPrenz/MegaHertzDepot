@@ -13,7 +13,19 @@ import {
   Adjustment,
   HardwareCategory,
   HardwareSpecs,
+  getDefaultCatalogImageUrl,
 } from '@countwise/shared';
+
+function resolvePublicImageUrl(
+  imageUrl?: string | null,
+  sku?: string | null,
+  name?: string | null
+): string | null {
+  if (imageUrl && !imageUrl.startsWith('local-img://')) {
+    return imageUrl;
+  }
+  return getDefaultCatalogImageUrl(sku, name) ?? imageUrl ?? null;
+}
 
 const router = Router();
 
@@ -129,7 +141,7 @@ router.get('/catalog', async (req: Request, res: Response) => {
         price: p.price ?? 0,
         warranty: p.warranty ?? null,
         specs: (p.specs as HardwareSpecs) ?? null,
-        imageUrl: p.imageUrl ?? null,
+        imageUrl: resolvePublicImageUrl(p.imageUrl, p.sku, p.name),
         nameHlc: p.nameHlc,
         skuHlc: p.skuHlc ?? null,
         priceHlc: p.priceHlc ?? null,
@@ -166,7 +178,7 @@ router.get('/catalog', async (req: Request, res: Response) => {
       price: Number(p.price ?? 0),
       warranty: p.warranty ?? null,
       specs: (p.specs as HardwareSpecs) ?? null,
-      imageUrl: p.imageUrl ?? null,
+      imageUrl: resolvePublicImageUrl(p.imageUrl, p.sku, p.name),
       nameHlc: p.nameHlc,
       skuHlc: p.skuHlc ?? null,
       priceHlc: p.priceHlc ?? null,

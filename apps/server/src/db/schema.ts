@@ -168,6 +168,16 @@ export const appliedMutations = pgTable('applied_mutations', {
   appliedAt: timestamp('applied_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Uploaded Product Images (Persistent storage across ephemeral deploys)
+export const uploadedImages = pgTable('uploaded_images', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  filename: text('filename').unique().notNull(),
+  mimeType: text('mime_type').notNull(),
+  dataBase64: text('data_base64').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedStores: many(stores),

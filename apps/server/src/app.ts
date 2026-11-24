@@ -2,7 +2,11 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import { eq } from 'drizzle-orm';
 import { config } from './config.js';
+import { db } from './db/index.js';
+import { uploadedImages } from './db/schema.js';
+import { isPostgresAvailable, memoryDb } from './db/memory-fallback.js';
 import authRoutes from './routes/auth.routes.js';
 import syncRoutes from './routes/sync.routes.js';
 import storeRoutes from './routes/store.routes.js';
@@ -33,7 +37,7 @@ app.use(
   })
 );
 
-// Serve locally uploaded files statically with safe headers
+// Serve locally uploaded files statically with safe headers, with DB fallback for ephemeral hosts
 app.use(
   '/uploads',
   express.static(path.join(process.cwd(), 'uploads'), {
@@ -43,6 +47,48 @@ app.use(
     },
   })
 );
+
+app.get('/uploads/products/:filename', async (req: Request, res: Response, next: NextFunction) => {
+  const filename = String(req.params.filename || '');
+  if (!/^[a-zA-Z0-9._-]+$/.test(filename) || filename.includes('..')) {
+    res.status(400).json({ error: 'Invalid filename' });
+    return;
+  }
+
+  try {
+    const usePg = await isPostgresAvailable();
+    let record: { mimeType: string; dataBase64: string } | undefined;
+
+    if (usePg) {
+      const row = await db.query.uploadedImages.findFirst({
+        where: eq(uploadedImages.filename, filename),
+        columns: { mimeType: true, dataBase64: true },
+      });
+      if (row) {
+        record = row;
+      }
+    } else {
+      const mem = memoryDb.uploadedImages.get(filename);
+      if (mem) {
+        record = { mimeType: mem.mimeType, dataBase64: mem.dataBase64 };
+      }
+    }
+
+    if (!record) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+
+    const buffer = Buffer.from(record.dataBase64, 'base64');
+    res.setHeader('Content-Type', record.mimeType || 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Payload size limit (Section 13 Security Checklist)
 app.use(express.json({ limit: '2mb' }));

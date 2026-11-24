@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDb, ProductLocal } from '../db/index.js';
+import { AdjustmentLocal, localDb, ProductLocal } from '../db/index.js';
 import { ReceiptQuoteModal, QuoteBuildData } from '../components/ReceiptQuoteModal.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { PcRigSilhouette } from '../components/PcRigSilhouette.js';
+import { resolveEffectiveStock } from '../services/publicCatalogSync.js';
 import {
   HARDWARE_CATEGORIES,
   HardwareCategory,
@@ -90,12 +91,18 @@ export function PcBuilderPage({
   );
 
   const stockByProduct = useMemo(() => {
-    const map = new Map<string, number>();
+    const adjustmentsByProduct = new Map<string, AdjustmentLocal[]>();
     for (const adj of adjustments) {
-      map.set(adj.productId, (map.get(adj.productId) || 0) + adj.delta);
+      const list = adjustmentsByProduct.get(adj.productId);
+      if (list) list.push(adj);
+      else adjustmentsByProduct.set(adj.productId, [adj]);
+    }
+    const map = new Map<string, number>();
+    for (const p of products) {
+      map.set(p.id, resolveEffectiveStock(p, adjustmentsByProduct.get(p.id) ?? []));
     }
     return map;
-  }, [adjustments]);
+  }, [products, adjustments]);
 
   const productsByCategory = useMemo(() => {
     const map = new Map<HardwareCategory, ProductLocal[]>();
@@ -629,6 +636,7 @@ export function PcBuilderPage({
                       <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
                         <ProductImage
                           imageUrl={product.imageUrl}
+                          sku={product.sku}
                           name={product.name}
                           category={product.category}
                           className="w-14 h-14 rounded-xl shrink-0"

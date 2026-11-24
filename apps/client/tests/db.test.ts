@@ -1,9 +1,14 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Dexie from 'dexie';
 import { SAMPLE_PC_HARDWARE_CATALOG } from '@countwise/shared';
 import { CountwiseDatabase } from '../src/db/index.js';
 import { LocalFirstRepository } from '../src/services/localRepository.js';
+import {
+  resolveEffectiveStock,
+  syncPublicCatalog,
+  decrementCachedPublicStock,
+} from '../src/services/publicCatalogSync.js';
 
 describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
   let db: CountwiseDatabase;
@@ -14,6 +19,10 @@ describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
   beforeEach(() => {
     db = new CountwiseDatabase(`test_db_${Math.random().toString(36).slice(2)}`);
     repo = new LocalFirstRepository(db);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('should initialize local tables with correct schema', () => {
@@ -162,8 +171,9 @@ describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
     expect(cpu).toBeDefined();
     expect(cpu.category).toBe('CPU');
     expect(cpu.specs?.socket).toBe('AM5');
-    expect(cpu.imageUrl).toBe('/images/products/CPU-AMD-7800X3D.svg');
-    expect(products.filter((p) => p.imageUrl).every((p) => p.imageUrl?.startsWith('/images/products/'))).toBe(true);
+    expect(cpu.imageUrl).toBe('/images/products/CPU-AMD-7800X3D.webp');
+    expect(products).toHaveLength(142);
+    expect(products.every((p) => /^\/images\/products\/.+\.webp$/.test(p.imageUrl ?? ''))).toBe(true);
 
     const stockBefore = await repo.getProductStockInfo(cpu.id);
     expect(stockBefore.currentStock).toBe(8);
@@ -355,5 +365,80 @@ describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
     });
     expect(exactOrder.amountTendered).toBe(5200);
     expect(exactOrder.changeDue).toBe(0);
+  });
+
+  it('should persist publicStock across views, heal missing local-img pointers, and decrement cached stock', async () => {
+    const productId = '50000000-0000-4000-8000-000000000021';
+    const remoteStoreId = '689d7ece-d8a4-4bae-816f-924878890913';
+
+    // Pre-seed a product with stale local-img:// missing from IndexedDB productImages
+    await db.products.put({
+      id: productId,
+      storeId: remoteStoreId,
+      name: 'AMD Ryzen 5 5600 6-Core Processor',
+      sku: 'CPU-AMD-5600',
+      category: 'CPU',
+      price: 5200,
+      imageUrl: 'local-img://missing-on-this-device',
+      nameHlc: '001700000001000:000000:staff-pc',
+      imageHlc: '001700000002000:000000:staff-pc',
+    });
+
+    const mockFetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        storeId: remoteStoreId,
+        products: [
+          {
+            id: productId,
+            storeId: remoteStoreId,
+            name: 'AMD Ryzen 5 5600 6-Core Processor',
+            sku: 'CPU-AMD-5600',
+            category: 'CPU',
+            brand: 'AMD',
+            price: 5200,
+            imageUrl: '/images/products/CPU-AMD-5600.webp',
+            nameHlc: '001700000001000:000000:staff-pc',
+            imageHlc: '001700000001000:000000:staff-pc',
+            stock: 13,
+          },
+        ],
+      }),
+    }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    const result = await syncPublicCatalog(remoteStoreId, { db });
+    expect(result).toEqual({ storeId: remoteStoreId, productsCount: 1 });
+
+    const synced = await db.products.get(productId);
+    expect(synced).toBeDefined();
+    expect(synced?.publicStock).toBe(13);
+    expect(synced?.imageUrl).toBe('/images/products/CPU-AMD-5600.webp');
+
+    // Without local adjustments, resolveEffectiveStock returns persisted publicStock
+    expect(resolveEffectiveStock(synced!, [])).toBe(13);
+
+    // Local adjustments override publicStock when present (e.g. staff terminal)
+    expect(
+      resolveEffectiveStock(synced!, [
+        {
+          id: 'adj-1',
+          productId,
+          storeId: remoteStoreId,
+          delta: 7,
+          reason: 'count',
+          createdAt: Date.now(),
+          hlc: '001700000003000:000000:pos',
+          deviceId: 'pos',
+          userId,
+        },
+      ])
+    ).toBe(7);
+
+    // Decrement cached stock optimistically after checkout
+    await decrementCachedPublicStock([{ productId, quantity: 3 }], db);
+    const afterDecrement = await db.products.get(productId);
+    expect(afterDecrement?.publicStock).toBe(10);
+    expect(resolveEffectiveStock(afterDecrement!, [])).toBe(10);
   });
 });

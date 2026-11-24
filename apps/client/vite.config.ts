@@ -34,17 +34,29 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg,woff2}'],
+        globIgnores: ['**/images/products/*.webp'],
         navigateFallback: '/index.html',
         // Exclude sync & auth API routes from service worker caching
         navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/sync/, /^\/public/, /^\/upload$/],
         runtimeCaching: [
+          {
+            urlPattern: /^\/images\/products\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'catalog-images-cache',
+              expiration: {
+                maxEntries: 250,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+              },
+            },
+          },
           {
             urlPattern: /^\/uploads\/.*/,
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'product-images-cache',
               expiration: {
-                maxEntries: 100,
+                maxEntries: 250,
                 maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
               },
             },

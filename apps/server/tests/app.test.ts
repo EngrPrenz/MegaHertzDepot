@@ -671,4 +671,49 @@ describe('API Server & Sync Protocol Integration Tests', () => {
     expect(pulledAdj).toBeDefined();
     expect(pulledAdj.payload.delta).toBe(-2);
   });
+
+  it('should resolve local-img:// URLs to static catalog WebP images in GET /public/catalog', async () => {
+    const reg = await request(app).post('/auth/register').send({
+      email: 'catalog-img-owner@countwise.dev',
+      password: 'password123',
+      name: 'Image Fallback Depot',
+    });
+    const token = reg.body.accessToken;
+    const storeId = reg.body.defaultStoreId;
+    const productId = crypto.randomUUID();
+
+    const seedRes = await request(app)
+      .post('/sync/push')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        deviceId: 'admin-1',
+        mutations: [
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'product.create',
+            hlc: '001700000001000:000000:admin-1',
+            createdAt: 1700000001000,
+            payload: {
+              id: productId,
+              storeId,
+              name: 'AMD Ryzen 5 5600 6-Core Processor',
+              sku: 'CPU-AMD-5600',
+              category: 'CPU',
+              price: 5200,
+              imageUrl: 'local-img://device-only-uuid-1234',
+              nameHlc: '001700000001000:000000:admin-1',
+              imageHlc: '001700000001000:000000:admin-1',
+            },
+          },
+        ],
+      });
+
+    expect(seedRes.status).toBe(200);
+
+    const catalogRes = await request(app).get(`/public/catalog?storeId=${storeId}`);
+    expect(catalogRes.status).toBe(200);
+    expect(catalogRes.body.products).toHaveLength(1);
+    expect(catalogRes.body.products[0].imageUrl).toBe('/images/products/CPU-AMD-5600.webp');
+  });
 });

@@ -104,15 +104,47 @@ export async function compressImage(
 }
 
 /**
- * Compresses a product image and stores it in the local IndexedDB `productImages` table.
- * Returns a compact `local-img://<uuid>` URI (under 55 chars) so that syncing product metadata
- * never bloats the cloud database or requires external storage buckets.
+ * Compresses a product image in-browser to max 800x800 WebP.
+ * When online with a staff token, uploads to `/upload` (persisted in PostgreSQL)
+ * so the resulting `/uploads/products/...` URL renders on every device.
+ * Falls back to local IndexedDB (`local-img://<id>`) when offline or unauthenticated.
  */
 export async function uploadProductImage(
   file: File | Blob,
-  _token?: string | null
+  token?: string | null
 ): Promise<string> {
   const compressedBlob = await compressImage(file, 800, 800, 0.84);
+  const authToken =
+    token ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('countwise_token') : null);
+  const isOnline = typeof navigator === 'undefined' || navigator.onLine !== false;
+
+  if (isOnline && authToken && authToken !== 'offline_demo_token') {
+    try {
+      const ext = compressedBlob.type === 'image/jpeg' ? '.jpg' : '.webp';
+      const baseName =
+        file instanceof File ? file.name.replace(/\.[^.]+$/, '') || 'product' : 'product';
+      const formData = new FormData();
+      formData.append('image', compressedBlob, `${baseName}${ext}`);
+
+      const res = await fetch('/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (typeof data?.url === 'string' && data.url) {
+          return data.url;
+        }
+      }
+    } catch {
+      // Network error during upload: fall back to local IndexedDB image
+    }
+  }
+
   const dataUrl = await blobToDataUrl(compressedBlob);
   const id = generateImageId();
   const fileName = file instanceof File ? file.name : `product-${id.slice(0, 8)}.webp`;

@@ -146,6 +146,18 @@ export async function runMigrations() {
       );
     `);
 
+    // Uploaded Product Images
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS uploaded_images (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        filename TEXT UNIQUE NOT NULL,
+        mime_type TEXT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+
     await client.query('COMMIT');
     console.log('Database tables and indexes verified successfully.');
   } catch (error) {

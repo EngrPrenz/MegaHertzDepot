@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { HardwareCategory, getDefaultCatalogImageUrl } from '@countwise/shared';
 import { localDb } from '../db/index.js';
@@ -132,8 +132,9 @@ export function ProductImage({
   className = 'w-16 h-16',
   alt,
 }: ProductImageProps) {
-  const [hasError, setHasError] = useState(false);
+  const [candidateIndex, setCandidateIndex] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   const isLocalIdb = isLocalImageUri(imageUrl);
   const localImageId = isLocalIdb && imageUrl ? extractLocalImageId(imageUrl) : null;
@@ -148,18 +149,39 @@ export function ProductImage({
     undefined
   );
 
-  // Resolve effective image URL:
+  // Resolve candidate image URLs in priority order:
   // 1. Local IndexedDB blob dataUrl if `local-img://`
   // 2. Direct URL / public static path if standard string
-  // 3. Automatic fallback to static `/images/products/<SKU>.svg` if SKU or Name matches catalog
+  // 3. Automatic fallback to static `/images/products/<SKU>.webp` if SKU or Name matches catalog
   const catalogFallbackUrl = getDefaultCatalogImageUrl(sku, name);
-  const resolvedSrc = isLocalIdb
-    ? localRecord?.dataUrl || catalogFallbackUrl || null
-    : imageUrl || catalogFallbackUrl || null;
+  const candidates = useMemo(() => {
+    const list: string[] = [];
+    if (isLocalIdb) {
+      if (localRecord?.dataUrl) {
+        list.push(localRecord.dataUrl);
+      }
+    } else if (imageUrl) {
+      list.push(imageUrl);
+    }
+    if (catalogFallbackUrl && !list.includes(catalogFallbackUrl)) {
+      list.push(catalogFallbackUrl);
+    }
+    return list;
+  }, [isLocalIdb, localRecord?.dataUrl, imageUrl, catalogFallbackUrl]);
+
+  const candidatesKey = candidates.join('|');
+  useEffect(() => {
+    setCandidateIndex(0);
+  }, [candidatesKey]);
+
+  const resolvedSrc = candidates[candidateIndex] ?? null;
 
   useEffect(() => {
-    setHasError(false);
-    setIsLoaded(false);
+    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
+      setIsLoaded(true);
+    } else {
+      setIsLoaded(false);
+    }
   }, [resolvedSrc]);
 
   const theme = CATEGORY_THEMES[category] || CATEGORY_THEMES.Peripheral;
@@ -168,8 +190,8 @@ export function ProductImage({
 
   const isInlineDataUrl = Boolean(resolvedSrc && resolvedSrc.startsWith('data:'));
 
-  // If valid resolved image and not errored, render img with fallback
-  if (resolvedSrc && !hasError) {
+  // If valid resolved image and not exhausted, render img with fallback
+  if (resolvedSrc) {
     return (
       <div
         className={`relative overflow-hidden rounded-xl bg-stone-900 border border-stone-800/80 flex items-center justify-center ${className}`}
@@ -180,10 +202,12 @@ export function ProductImage({
           </div>
         )}
         <img
+          ref={imgRef}
           src={resolvedSrc}
           alt={alt || name}
+          decoding="async"
           onLoad={() => setIsLoaded(true)}
-          onError={() => setHasError(true)}
+          onError={() => setCandidateIndex((idx) => idx + 1)}
           className={`w-full h-full object-cover transition-all duration-200 ${
             isLoaded || isInlineDataUrl ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
           }`}

@@ -44,7 +44,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Manufacturer Warranty',
     specs: { socket: 'AM5', wattage: 120 },
     initialStock: 8,
-    imageUrl: '/images/products/CPU-AMD-7800X3D.svg',
+    imageUrl: '/images/products/CPU-AMD-7800X3D.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000002',
@@ -57,7 +57,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Manufacturer Warranty',
     specs: { socket: 'LGA1700', wattage: 181 },
     initialStock: 10,
-    imageUrl: '/images/products/CPU-INT-14600K.svg',
+    imageUrl: '/images/products/CPU-INT-14600K.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000003',
@@ -70,7 +70,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 55, formFactor: 'ATX' },
     initialStock: 6,
-    imageUrl: '/images/products/MB-ASUS-B650A.svg',
+    imageUrl: '/images/products/MB-ASUS-B650A.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000004',
@@ -83,7 +83,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR4', wattage: 45, formFactor: 'mATX' },
     initialStock: 9,
-    imageUrl: '/images/products/MB-MSI-B760MA-D4.svg',
+    imageUrl: '/images/products/MB-MSI-B760MA-D4.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000005',
@@ -96,7 +96,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: 'Limited Lifetime Warranty',
     specs: { ramType: 'DDR5', wattage: 15 },
     initialStock: 14,
-    imageUrl: '/images/products/RAM-GSK-32G-D5.svg',
+    imageUrl: '/images/products/RAM-GSK-32G-D5.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000006',
@@ -109,7 +109,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: 'Limited Lifetime Warranty',
     specs: { ramType: 'DDR4', wattage: 10 },
     initialStock: 20,
-    imageUrl: '/images/products/RAM-KNG-16G-D4.svg',
+    imageUrl: '/images/products/RAM-KNG-16G-D4.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000007',
@@ -122,7 +122,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Manufacturer Warranty',
     specs: { wattage: 220 },
     initialStock: 5,
-    imageUrl: '/images/products/GPU-GB-4070S.svg',
+    imageUrl: '/images/products/GPU-GB-4070S.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000008',
@@ -135,7 +135,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '2 Years Supplier Warranty',
     specs: { wattage: 263 },
     initialStock: 4,
-    imageUrl: '/images/products/GPU-SAP-7800XT.svg',
+    imageUrl: '/images/products/GPU-SAP-7800XT.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000009',
@@ -148,7 +148,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '5 Years Limited Warranty',
     specs: { wattage: 8 },
     initialStock: 18,
-    imageUrl: '/images/products/SSD-SAM-990P-1T.svg',
+    imageUrl: '/images/products/SSD-SAM-990P-1T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000010',
@@ -161,7 +161,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '7 Years Manufacturer Warranty',
     specs: { wattage: 750, formFactor: 'ATX' },
     initialStock: 11,
-    imageUrl: '/images/products/PSU-COR-RM750E.svg',
+    imageUrl: '/images/products/PSU-COR-RM750E.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000011',
@@ -174,7 +174,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '2 Years Store Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 7,
-    imageUrl: '/images/products/CASE-NZXT-H6F.svg',
+    imageUrl: '/images/products/CASE-NZXT-H6F.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000012',
@@ -187,7 +187,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Store Warranty',
     specs: { wattage: 10 },
     initialStock: 12,
-    imageUrl: '/images/products/COOL-DC-AK620.svg',
+    imageUrl: '/images/products/COOL-DC-AK620.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000013',
@@ -200,7 +200,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Onsite Warranty',
     specs: { wattage: 35 },
     initialStock: 6,
-    imageUrl: '/images/products/MON-ASUS-VG27AQ.svg',
+    imageUrl: '/images/products/MON-ASUS-VG27AQ.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000014',
@@ -213,7 +213,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '2 Years Hardware Warranty',
     specs: {},
     initialStock: 15,
-    imageUrl: '/images/products/PER-LOG-GPX2.svg',
+    imageUrl: '/images/products/PER-LOG-GPX2.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000015',
@@ -226,6 +226,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 65 },
     initialStock: 10,
+    imageUrl: '/images/products/CPU-AMD-7600.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000016',
@@ -238,6 +239,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 65 },
     initialStock: 10,
+    imageUrl: '/images/products/CPU-AMD-9600X.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000017',
@@ -250,6 +252,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 65 },
     initialStock: 7,
+    imageUrl: '/images/products/CPU-AMD-9700X.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000018',
@@ -262,6 +265,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 120 },
     initialStock: 7,
+    imageUrl: '/images/products/CPU-AMD-9800X3D.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000019',
@@ -274,6 +278,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 120 },
     initialStock: 7,
+    imageUrl: '/images/products/CPU-AMD-9900X.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000020',
@@ -286,6 +291,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 170 },
     initialStock: 5,
+    imageUrl: '/images/products/CPU-AMD-9950X3D.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000021',
@@ -298,6 +304,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM4', ramType: 'DDR4', wattage: 65 },
     initialStock: 14,
+    imageUrl: '/images/products/CPU-AMD-5600.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000022',
@@ -310,6 +317,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM4', ramType: 'DDR4', wattage: 105 },
     initialStock: 10,
+    imageUrl: '/images/products/CPU-AMD-5700X3D.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000023',
@@ -322,6 +330,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR4', wattage: 58 },
     initialStock: 14,
+    imageUrl: '/images/products/CPU-INT-12100F.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000024',
@@ -334,6 +343,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR4', wattage: 65 },
     initialStock: 14,
+    imageUrl: '/images/products/CPU-INT-12400F.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000025',
@@ -346,6 +356,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR5', wattage: 65 },
     initialStock: 10,
+    imageUrl: '/images/products/CPU-INT-14400F.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000026',
@@ -358,6 +369,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR5', wattage: 253 },
     initialStock: 7,
+    imageUrl: '/images/products/CPU-INT-14700K.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000027',
@@ -370,6 +382,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1851', ramType: 'DDR5', wattage: 125 },
     initialStock: 10,
+    imageUrl: '/images/products/CPU-INT-U5-245K.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000028',
@@ -382,6 +395,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1851', ramType: 'DDR5', wattage: 125 },
     initialStock: 7,
+    imageUrl: '/images/products/CPU-INT-U7-265K.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000029',
@@ -394,6 +408,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1851', ramType: 'DDR5', wattage: 125 },
     initialStock: 7,
+    imageUrl: '/images/products/CPU-INT-U9-285K.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000030',
@@ -406,6 +421,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 50, formFactor: 'mATX' },
     initialStock: 10,
+    imageUrl: '/images/products/MB-ASUS-B650M-A.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000031',
@@ -418,6 +434,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 55, formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/MB-MSI-B650-TMH.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000032',
@@ -430,6 +447,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 55, formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/MB-GB-B850-AE.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000033',
@@ -442,6 +460,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM5', ramType: 'DDR5', wattage: 65, formFactor: 'ATX' },
     initialStock: 7,
+    imageUrl: '/images/products/MB-ASR-X870E-TAI.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000034',
@@ -454,6 +473,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM4', ramType: 'DDR4', wattage: 40, formFactor: 'mATX' },
     initialStock: 20,
+    imageUrl: '/images/products/MB-GB-A520MK.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000035',
@@ -466,6 +486,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'AM4', ramType: 'DDR4', wattage: 40, formFactor: 'mATX' },
     initialStock: 14,
+    imageUrl: '/images/products/MB-MSI-B550M-PVDH.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000036',
@@ -478,6 +499,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR4', wattage: 35, formFactor: 'mATX' },
     initialStock: 20,
+    imageUrl: '/images/products/MB-ASUS-H610MK.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000037',
@@ -490,6 +512,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR4', wattage: 40, formFactor: 'mATX' },
     initialStock: 14,
+    imageUrl: '/images/products/MB-GB-B760M-DS3H.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000038',
@@ -502,6 +525,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1700', ramType: 'DDR4', wattage: 55, formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/MB-ASUS-Z790-TUF.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000039',
@@ -514,6 +538,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1851', ramType: 'DDR5', wattage: 55, formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/MB-MSI-Z890-P.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000040',
@@ -526,6 +551,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1851', ramType: 'DDR5', wattage: 65, formFactor: 'ATX' },
     initialStock: 7,
+    imageUrl: '/images/products/MB-ASUS-Z890-E.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000041',
@@ -538,6 +564,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { socket: 'LGA1851', ramType: 'DDR5', wattage: 45, formFactor: 'mATX' },
     initialStock: 10,
+    imageUrl: '/images/products/MB-GB-B860M-AE.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000042',
@@ -550,6 +577,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 145 },
     initialStock: 10,
+    imageUrl: '/images/products/GPU-MSI-5060.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000043',
@@ -562,6 +590,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 180 },
     initialStock: 7,
+    imageUrl: '/images/products/GPU-ASUS-5060TI-16.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000044',
@@ -574,6 +603,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 250 },
     initialStock: 7,
+    imageUrl: '/images/products/GPU-GB-5070.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000045',
@@ -586,6 +616,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 300 },
     initialStock: 5,
+    imageUrl: '/images/products/GPU-MSI-5070TI.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000046',
@@ -598,6 +629,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 360 },
     initialStock: 3,
+    imageUrl: '/images/products/GPU-ASUS-5080.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000047',
@@ -610,6 +642,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 575 },
     initialStock: 3,
+    imageUrl: '/images/products/GPU-MSI-5090.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000048',
@@ -622,6 +655,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 115 },
     initialStock: 10,
+    imageUrl: '/images/products/GPU-ZOT-4060.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000049',
@@ -634,6 +668,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 70 },
     initialStock: 10,
+    imageUrl: '/images/products/GPU-GB-3050.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000050',
@@ -646,6 +681,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 160 },
     initialStock: 7,
+    imageUrl: '/images/products/GPU-SAP-9060XT.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000051',
@@ -658,6 +694,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 220 },
     initialStock: 5,
+    imageUrl: '/images/products/GPU-SAP-9070.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000052',
@@ -670,6 +707,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 304 },
     initialStock: 5,
+    imageUrl: '/images/products/GPU-SAP-9070XT.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000053',
@@ -682,6 +720,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 165 },
     initialStock: 10,
+    imageUrl: '/images/products/GPU-PWC-7600.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000054',
@@ -694,6 +733,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 190 },
     initialStock: 10,
+    imageUrl: '/images/products/GPU-INT-B580.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000055',
@@ -706,6 +746,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR5', wattage: 10 },
     initialStock: 20,
+    imageUrl: '/images/products/RAM-KNG-16G-D5.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000056',
@@ -718,6 +759,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR5', wattage: 10 },
     initialStock: 14,
+    imageUrl: '/images/products/RAM-COR-32G-D5.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000057',
@@ -730,6 +772,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR5', wattage: 10 },
     initialStock: 14,
+    imageUrl: '/images/products/RAM-GSK-RJS5-32.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000058',
@@ -742,6 +785,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR5', wattage: 10 },
     initialStock: 10,
+    imageUrl: '/images/products/RAM-TG-64G-D5.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000059',
@@ -754,6 +798,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR5', wattage: 10 },
     initialStock: 10,
+    imageUrl: '/images/products/RAM-COR-DT-48.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000060',
@@ -766,6 +811,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR4', wattage: 10 },
     initialStock: 20,
+    imageUrl: '/images/products/RAM-KNG-8G-D4.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000061',
@@ -778,6 +824,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR4', wattage: 10 },
     initialStock: 14,
+    imageUrl: '/images/products/RAM-COR-LPX-32-D4.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000062',
@@ -790,6 +837,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR4', wattage: 10 },
     initialStock: 20,
+    imageUrl: '/images/products/RAM-TG-16G-D4.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000063',
@@ -802,6 +850,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { ramType: 'DDR5', wattage: 10 },
     initialStock: 14,
+    imageUrl: '/images/products/RAM-CRU-32G-D5.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000064',
@@ -814,6 +863,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 14,
+    imageUrl: '/images/products/SSD-SAM-990EP-1T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000065',
@@ -826,6 +876,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 10,
+    imageUrl: '/images/products/SSD-SAM-9100P-2T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000066',
@@ -838,6 +889,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 10,
+    imageUrl: '/images/products/SSD-WD-SN850X-2T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000067',
@@ -850,6 +902,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 14,
+    imageUrl: '/images/products/SSD-CRU-P3P-1T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000068',
@@ -862,6 +915,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 20,
+    imageUrl: '/images/products/SSD-KNG-NV3-500.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000069',
@@ -874,6 +928,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 14,
+    imageUrl: '/images/products/SSD-KNG-KC3000-1T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000070',
@@ -886,6 +941,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 10,
+    imageUrl: '/images/products/SSD-LEX-NM790-2T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000071',
@@ -898,6 +954,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 14,
+    imageUrl: '/images/products/SSD-CRU-MX500-1T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000072',
@@ -910,6 +967,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 8 },
     initialStock: 20,
+    imageUrl: '/images/products/HDD-SEA-BC-2T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000073',
@@ -922,6 +980,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 8 },
     initialStock: 14,
+    imageUrl: '/images/products/HDD-WD-BLUE-4T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000074',
@@ -934,6 +993,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 8 },
     initialStock: 10,
+    imageUrl: '/images/products/HDD-SEA-IW-8T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000075',
@@ -946,6 +1006,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 6 },
     initialStock: 14,
+    imageUrl: '/images/products/EXT-SAM-T7S-1T.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000076',
@@ -958,6 +1019,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 650, formFactor: 'ATX' },
     initialStock: 20,
+    imageUrl: '/images/products/PSU-COR-CV650.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000077',
@@ -970,6 +1032,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 850, formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/PSU-SEA-GX850.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000078',
@@ -982,6 +1045,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 750, formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/PSU-MSI-A750GL.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000079',
@@ -994,6 +1058,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 1000, formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/PSU-COR-RM1000X.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000080',
@@ -1006,6 +1071,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 850, formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/PSU-CM-MWE850.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000081',
@@ -1018,6 +1084,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 750, formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/PSU-BQ-PP12-750.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000082',
@@ -1030,6 +1097,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 1200, formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/PSU-ASUS-THOR1200.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000083',
@@ -1042,6 +1110,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 550, formFactor: 'ATX' },
     initialStock: 20,
+    imageUrl: '/images/products/PSU-DC-PK550D.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000084',
@@ -1054,6 +1123,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/CASE-LL-LC216.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000085',
@@ -1066,6 +1136,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/CASE-LL-O11EVO.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000086',
@@ -1078,6 +1149,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/CASE-COR-4000DA.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000087',
@@ -1090,6 +1162,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 10,
+    imageUrl: '/images/products/CASE-FD-NORTH.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000088',
@@ -1102,6 +1175,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 20,
+    imageUrl: '/images/products/CASE-MON-AIR903.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000089',
@@ -1114,6 +1188,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/CASE-MON-K95P.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000090',
@@ -1126,6 +1201,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'mATX' },
     initialStock: 14,
+    imageUrl: '/images/products/CASE-DC-CH360.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000091',
@@ -1138,6 +1214,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/CASE-NZXT-H5F.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000092',
@@ -1150,6 +1227,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ITX' },
     initialStock: 14,
+    imageUrl: '/images/products/CASE-CM-NR200P.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000093',
@@ -1162,6 +1240,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { formFactor: 'ATX' },
     initialStock: 14,
+    imageUrl: '/images/products/CASE-PHK-XTPU.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000094',
@@ -1174,6 +1253,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 120 },
     initialStock: 20,
+    imageUrl: '/images/products/COOL-DC-AG400.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000095',
@@ -1186,6 +1266,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 200 },
     initialStock: 20,
+    imageUrl: '/images/products/COOL-TR-PS120SE.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000096',
@@ -1198,6 +1279,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 250 },
     initialStock: 14,
+    imageUrl: '/images/products/COOL-NOC-D15G2.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000097',
@@ -1210,6 +1292,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 300 },
     initialStock: 14,
+    imageUrl: '/images/products/COOL-ARC-LF3-360.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000098',
@@ -1222,6 +1305,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 300 },
     initialStock: 10,
+    imageUrl: '/images/products/COOL-COR-H150I.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000099',
@@ -1234,6 +1318,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 250 },
     initialStock: 14,
+    imageUrl: '/images/products/COOL-LL-GII240.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000100',
@@ -1246,6 +1331,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 300 },
     initialStock: 14,
+    imageUrl: '/images/products/COOL-DC-LT720.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000101',
@@ -1258,6 +1344,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 5 },
     initialStock: 20,
+    imageUrl: '/images/products/COOL-ARC-P12-5PK.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000102',
@@ -1270,6 +1357,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 5 },
     initialStock: 20,
+    imageUrl: '/images/products/COOL-TG-KRYO.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000103',
@@ -1282,6 +1370,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 14,
+    imageUrl: '/images/products/MON-LG-24GS60F.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000104',
@@ -1294,6 +1383,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 14,
+    imageUrl: '/images/products/MON-AOC-27G4.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000105',
@@ -1306,6 +1396,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 10,
+    imageUrl: '/images/products/MON-MSI-274QRF.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000106',
@@ -1318,6 +1409,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 10,
+    imageUrl: '/images/products/MON-GB-M27QX.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000107',
@@ -1330,6 +1422,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 10,
+    imageUrl: '/images/products/MON-DEL-S2725DS.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000108',
@@ -1342,6 +1435,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 7,
+    imageUrl: '/images/products/MON-LG-27GR95QE.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000109',
@@ -1354,6 +1448,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 5,
+    imageUrl: '/images/products/MON-ASUS-PG32UCDM.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000110',
@@ -1366,6 +1461,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 10,
+    imageUrl: '/images/products/MON-SAM-G5-34.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000111',
@@ -1378,6 +1474,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 14,
+    imageUrl: '/images/products/MON-BNQ-GW2480.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000112',
@@ -1390,6 +1487,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '3 Years Supplier Warranty',
     specs: { wattage: 35 },
     initialStock: 7,
+    imageUrl: '/images/products/MON-DEL-U2723QE.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000113',
@@ -1402,6 +1500,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 14,
+    imageUrl: '/images/products/PER-RAZ-DAV3P.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000114',
@@ -1414,6 +1513,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-LOG-G304.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000115',
@@ -1426,6 +1526,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 10,
+    imageUrl: '/images/products/PER-RAZ-HV3P.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000116',
@@ -1438,6 +1539,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 10,
+    imageUrl: '/images/products/PER-KEY-K2HE.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000117',
@@ -1450,6 +1552,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-RK-RK84.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000118',
@@ -1462,6 +1565,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 14,
+    imageUrl: '/images/products/PER-HYX-CLD2W.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000119',
@@ -1474,6 +1578,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 10,
+    imageUrl: '/images/products/PER-SS-AN7.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000120',
@@ -1486,6 +1591,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-LOG-C920.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000121',
@@ -1498,6 +1604,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 14,
+    imageUrl: '/images/products/PER-ELG-FCMK2.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000122',
@@ -1510,6 +1617,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 14,
+    imageUrl: '/images/products/PER-BLU-YETI.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000123',
@@ -1522,6 +1630,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-SS-QCKXXL.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000124',
@@ -1534,6 +1643,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-MS-XBOXCTL.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000125',
@@ -1546,6 +1656,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-TPL-AX55.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000126',
@@ -1558,6 +1669,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-TPL-TX20E.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000127',
@@ -1570,6 +1682,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 14,
+    imageUrl: '/images/products/PER-APC-BX1100.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000128',
@@ -1582,6 +1695,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 20,
+    imageUrl: '/images/products/PER-LOG-Z407.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000129',
@@ -1594,6 +1708,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Supplier Warranty',
     specs: {},
     initialStock: 10,
+    imageUrl: '/images/products/PER-ELG-SDMK2.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000130',
@@ -1606,6 +1721,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 7,
+    imageUrl: '/images/products/LAP-ASUS-VB15.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000131',
@@ -1618,6 +1734,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 7,
+    imageUrl: '/images/products/LAP-ACE-AL14.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000132',
@@ -1630,6 +1747,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 7,
+    imageUrl: '/images/products/LAP-LEN-IPS3.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000133',
@@ -1642,6 +1760,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 5,
+    imageUrl: '/images/products/LAP-LEN-LOQ15.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000134',
@@ -1654,6 +1773,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 5,
+    imageUrl: '/images/products/LAP-ASUS-TUFA15.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000135',
@@ -1666,6 +1786,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 5,
+    imageUrl: '/images/products/LAP-MSI-THIN15.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000136',
@@ -1678,6 +1799,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 5,
+    imageUrl: '/images/products/LAP-ACE-NV15.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000137',
@@ -1690,6 +1812,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 3,
+    imageUrl: '/images/products/LAP-ASUS-G14.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000138',
@@ -1702,6 +1825,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 5,
+    imageUrl: '/images/products/LAP-APL-MBA13M3.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000139',
@@ -1714,6 +1838,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 3,
+    imageUrl: '/images/products/LAP-APL-MBP14M4P.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000140',
@@ -1726,6 +1851,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 3,
+    imageUrl: '/images/products/LAP-DEL-XPS13.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000141',
@@ -1738,6 +1864,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 7,
+    imageUrl: '/images/products/LAP-HP-PAV15.webp',
   },
   {
     id: '50000000-0000-4000-8000-000000000142',
@@ -1750,6 +1877,7 @@ export const SAMPLE_PC_HARDWARE_CATALOG: SampleHardwareItem[] = [
     warranty: '1 Year Manufacturer Warranty',
     specs: {},
     initialStock: 3,
+    imageUrl: '/images/products/LAP-LEN-LEG5I.webp',
   },
 ];
 

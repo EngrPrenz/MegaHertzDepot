@@ -1,12 +1,15 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDb, SaleOrderLocal } from '../db/index.js';
+import { AdjustmentLocal, localDb, SaleOrderLocal } from '../db/index.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { MegaHertzLogo } from '../components/MegaHertzLogo.js';
 import { CustomerAuthModal } from '../components/CustomerAuthModal.js';
 import { CustomerCheckoutModal, StorefrontCartItem } from '../components/CustomerCheckoutModal.js';
 import {
-  computeDerivedStock,
+  resolveEffectiveStock,
+  decrementCachedPublicStock,
+} from '../services/publicCatalogSync.js';
+import {
   formatCurrency,
 } from '@countwise/shared';
 import {
@@ -105,10 +108,15 @@ export function ProductDetailPage({
   }, [products, productId]);
 
   const stockMap = useMemo(() => {
+    const adjustmentsByProduct = new Map<string, AdjustmentLocal[]>();
+    for (const adj of adjustments) {
+      const list = adjustmentsByProduct.get(adj.productId);
+      if (list) list.push(adj);
+      else adjustmentsByProduct.set(adj.productId, [adj]);
+    }
     const map = new Map<string, number>();
     for (const p of products) {
-      const pAdjustments = adjustments.filter((a) => a.productId === p.id);
-      map.set(p.id, computeDerivedStock(pAdjustments));
+      map.set(p.id, resolveEffectiveStock(p, adjustmentsByProduct.get(p.id) ?? []));
     }
     return map;
   }, [products, adjustments]);
@@ -194,9 +202,10 @@ export function ProductDetailPage({
     showToast('Signed out of customer account.');
   };
 
-  const handleOrderPlaced = (_order: SaleOrderLocal) => {
+  const handleOrderPlaced = (order: SaleOrderLocal) => {
     updateCart([]);
     setIsCartOpen(false);
+    void decrementCachedPublicStock(order.items);
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -348,6 +357,7 @@ export function ProductDetailPage({
             <div className="relative rounded-3xl bg-stone-900 border border-stone-800 p-4 sm:p-8 flex items-center justify-center overflow-hidden shadow-2xl flex-1 min-h-[460px] sm:min-h-[520px] lg:min-h-[560px]">
               <ProductImage
                 imageUrl={product.imageUrl}
+                sku={product.sku}
                 name={product.name}
                 category={product.category}
                 className="w-full h-full min-h-[400px] sm:min-h-[480px] lg:min-h-[520px] rounded-2xl object-cover"
@@ -597,6 +607,7 @@ export function ProductDetailPage({
                       <div className="overflow-hidden rounded-xl bg-stone-950 flex items-center justify-center">
                         <ProductImage
                           imageUrl={rel.imageUrl}
+                          sku={rel.sku}
                           name={rel.name}
                           category={rel.category}
                           className="w-full h-36 rounded-xl group-hover:scale-105 transition-transform duration-300"
@@ -668,6 +679,7 @@ export function ProductDetailPage({
                       <div key={item.product.id} className="py-3 flex items-center gap-3">
                         <ProductImage
                           imageUrl={item.product.imageUrl}
+                          sku={item.product.sku}
                           name={item.product.name}
                           category={item.product.category}
                           className="w-12 h-12 rounded-xl shrink-0"

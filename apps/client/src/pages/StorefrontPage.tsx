@@ -1,15 +1,17 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDb, ProductLocal, SaleOrderLocal } from '../db/index.js';
+import { AdjustmentLocal, localDb, ProductLocal, SaleOrderLocal } from '../db/index.js';
 import { ProductImage } from '../components/ProductImage.js';
 import { MegaHertzLogo } from '../components/MegaHertzLogo.js';
 import { CustomerAuthModal } from '../components/CustomerAuthModal.js';
 import { CustomerCheckoutModal, StorefrontCartItem } from '../components/CustomerCheckoutModal.js';
 import {
+  resolveEffectiveStock,
+  decrementCachedPublicStock,
+} from '../services/publicCatalogSync.js';
+import {
   HardwareCategory,
   HARDWARE_CATEGORIES,
-  HybridLogicalClock,
-  computeDerivedStock,
   formatCurrency,
 } from '@countwise/shared';
 import {
@@ -90,7 +92,6 @@ export function StorefrontPage({
   currencySymbol = '₱',
   onOpenPcBuilder,
   onSelectProduct,
-  onResolvePublicStoreId,
 }: StorefrontPageProps) {
   // Search & Sidebar Filter State
   const [search, setSearch] = useState('');
@@ -119,8 +120,6 @@ export function StorefrontPage({
 
   // Toast Feedback State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [remoteStockMap, setRemoteStockMap] = useState<Record<string, number>>({});
-  const [catalogRefreshTick, setCatalogRefreshTick] = useState(0);
 
   useEffect(() => {
     const handleExternalCartUpdate = () => {
@@ -138,126 +137,6 @@ export function StorefrontPage({
     window.addEventListener('megahertz-cart-updated', handleExternalCartUpdate);
     return () => window.removeEventListener('megahertz-cart-updated', handleExternalCartUpdate);
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncPublicCatalog = async () => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-      try {
-        const endpoint =
-          storeId === '22222222-2222-2222-2222-222222222222'
-            ? '/public/catalog'
-            : `/public/catalog?storeId=${encodeURIComponent(storeId)}`;
-        const res = await fetch(endpoint);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (
-          typeof data?.storeId === 'string' &&
-          data.storeId !== storeId &&
-          onResolvePublicStoreId
-        ) {
-          onResolvePublicStoreId(data.storeId);
-        }
-
-        if (!Array.isArray(data?.products)) return;
-
-        const nextStock: Record<string, number> = {};
-        for (const item of data.products) {
-          if (item?.id) {
-            nextStock[item.id] = Number(item.stock ?? 0);
-          }
-        }
-        setRemoteStockMap(nextStock);
-
-        await localDb.transaction('rw', [localDb.products], async () => {
-          for (const remote of data.products) {
-            if (!remote?.id || !remote?.name) continue;
-            const existing = await localDb.products.get(remote.id);
-            if (!existing) {
-              await localDb.products.put({
-                id: remote.id,
-                storeId: remote.storeId || storeId,
-                name: remote.name,
-                sku: remote.sku ?? undefined,
-                category: remote.category || 'Peripheral',
-                brand: remote.brand ?? undefined,
-                price: Number(remote.price ?? 0),
-                warranty: remote.warranty ?? undefined,
-                specs: remote.specs ?? undefined,
-                imageUrl: remote.imageUrl ?? undefined,
-                nameHlc: remote.nameHlc || '000000000000000:000000:server',
-                skuHlc: remote.skuHlc ?? undefined,
-                priceHlc: remote.priceHlc ?? undefined,
-                imageHlc: remote.imageHlc ?? undefined,
-              });
-            } else if (!existing.deletedAt) {
-              const merged = { ...existing };
-              let changed = false;
-
-              if (
-                remote.nameHlc &&
-                (!existing.nameHlc ||
-                  HybridLogicalClock.compare(remote.nameHlc, existing.nameHlc) > 0)
-              ) {
-                merged.name = remote.name;
-                merged.category = remote.category || merged.category;
-                merged.brand = remote.brand ?? undefined;
-                merged.warranty = remote.warranty ?? undefined;
-                merged.specs = remote.specs ?? undefined;
-                merged.nameHlc = remote.nameHlc;
-                changed = true;
-              }
-              if (
-                remote.skuHlc &&
-                (!existing.skuHlc || HybridLogicalClock.compare(remote.skuHlc, existing.skuHlc) > 0)
-              ) {
-                merged.sku = remote.sku ?? undefined;
-                merged.skuHlc = remote.skuHlc;
-                changed = true;
-              }
-              if (
-                remote.priceHlc &&
-                (!existing.priceHlc ||
-                  HybridLogicalClock.compare(remote.priceHlc, existing.priceHlc) > 0)
-              ) {
-                merged.price = Number(remote.price ?? merged.price ?? 0);
-                merged.priceHlc = remote.priceHlc;
-                changed = true;
-              }
-              if (
-                remote.imageHlc &&
-                (!existing.imageHlc ||
-                  HybridLogicalClock.compare(remote.imageHlc, existing.imageHlc) > 0)
-              ) {
-                merged.imageUrl = remote.imageUrl ?? undefined;
-                merged.imageHlc = remote.imageHlc;
-                changed = true;
-              }
-
-              if (changed) {
-                await localDb.products.put(merged);
-              }
-            }
-          }
-        });
-      } catch {
-        // Offline or network error: retain local Dexie catalog silently
-      }
-    };
-
-    void syncPublicCatalog();
-    const handleOnline = () => {
-      void syncPublicCatalog();
-    };
-    window.addEventListener('online', handleOnline);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('online', handleOnline);
-    };
-  }, [storeId, catalogRefreshTick, onResolvePublicStoreId]);
 
   // Live queries from Dexie
   const products = useLiveQuery(
@@ -279,19 +158,18 @@ export function StorefrontPage({
 
   // Stock computation map
   const stockMap = useMemo(() => {
+    const adjustmentsByProduct = new Map<string, AdjustmentLocal[]>();
+    for (const adj of adjustments) {
+      const list = adjustmentsByProduct.get(adj.productId);
+      if (list) list.push(adj);
+      else adjustmentsByProduct.set(adj.productId, [adj]);
+    }
     const map = new Map<string, number>();
     for (const p of products) {
-      const pAdjustments = adjustments.filter((a) => a.productId === p.id);
-      if (pAdjustments.length > 0) {
-        map.set(p.id, computeDerivedStock(pAdjustments));
-      } else if (Object.prototype.hasOwnProperty.call(remoteStockMap, p.id)) {
-        map.set(p.id, remoteStockMap[p.id]);
-      } else {
-        map.set(p.id, 0);
-      }
+      map.set(p.id, resolveEffectiveStock(p, adjustmentsByProduct.get(p.id) ?? []));
     }
     return map;
-  }, [products, adjustments, remoteStockMap]);
+  }, [products, adjustments]);
 
   // Available brands derived from catalog
   const availableBrands = useMemo(() => {
@@ -441,16 +319,7 @@ export function StorefrontPage({
   const handleOrderPlaced = (order: SaleOrderLocal) => {
     updateCart([]);
     setIsCartOpen(false);
-    setRemoteStockMap((prev) => {
-      const next = { ...prev };
-      for (const item of order.items) {
-        if (Object.prototype.hasOwnProperty.call(next, item.productId)) {
-          next[item.productId] = Math.max(0, next[item.productId] - item.quantity);
-        }
-      }
-      return next;
-    });
-    setCatalogRefreshTick((n) => n + 1);
+    void decrementCachedPublicStock(order.items);
   };
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);

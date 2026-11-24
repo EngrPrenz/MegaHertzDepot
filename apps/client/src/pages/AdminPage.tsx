@@ -705,6 +705,7 @@ export function AdminPage({
                       >
                         <ProductImage
                           imageUrl={product.imageUrl}
+                          sku={product.sku}
                           name={product.name}
                           category={product.category}
                           className="w-12 h-12 rounded-xl"
@@ -813,6 +814,7 @@ export function AdminPage({
                     >
                       <ProductImage
                         imageUrl={product.imageUrl}
+                        sku={product.sku}
                         name={product.name}
                         category={product.category}
                         className="w-full h-40 rounded-xl"
@@ -927,6 +929,7 @@ export function AdminPage({
             <div className="flex items-center gap-4 p-3 bg-stone-950 rounded-xl border border-stone-800">
               <ProductImage
                 imageUrl={addImageUrl}
+                sku={addSku}
                 name={addName || 'New Product'}
                 category={addCategory}
                 className="w-20 h-20 rounded-xl shrink-0"
@@ -1162,6 +1165,7 @@ export function AdminPage({
             <div className="flex items-center gap-4 p-3 bg-stone-950 rounded-xl border border-stone-800">
               <ProductImage
                 imageUrl={editImageUrl}
+                sku={editSku}
                 name={editName || 'Edit Product'}
                 category={editCategory}
                 className="w-20 h-20 rounded-xl shrink-0"
@@ -1436,6 +1440,7 @@ export function AdminPage({
           <div className="flex flex-col items-center space-y-4">
             <ProductImage
               imageUrl={previewProduct.imageUrl}
+              sku={previewProduct.sku}
               name={previewProduct.name}
               category={previewProduct.category}
               className="w-full max-w-sm h-64 rounded-2xl"

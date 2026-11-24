@@ -539,6 +539,7 @@ export function PosRegisterPage({
                   <div className="flex items-start gap-3">
                     <ProductImage
                       imageUrl={product.imageUrl}
+                      sku={product.sku}
                       name={product.name}
                       category={product.category}
                       className="w-14 h-14 rounded-xl shrink-0 group-hover:scale-105 transition-transform"

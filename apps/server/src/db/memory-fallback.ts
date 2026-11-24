@@ -28,6 +28,15 @@ export interface MemoryAppliedMutation {
   appliedAt: Date;
 }
 
+export interface MemoryUploadedImage {
+  id: string;
+  filename: string;
+  mimeType: string;
+  dataBase64: string;
+  sizeBytes: number;
+  createdAt: Date;
+}
+
 export const DEMO_USER_ID = '11111111-1111-1111-1111-111111111111';
 export const DEMO_STORE_ID = '22222222-2222-2222-2222-222222222222';
 
@@ -40,6 +49,7 @@ class InMemoryDatabase {
   public orders = new Map<string, SaleOrder>();
   public changeLog: ChangeLogItem[] = [];
   public appliedMutations = new Map<string, MemoryAppliedMutation>();
+  public uploadedImages = new Map<string, MemoryUploadedImage>();
   private seqCounter = 0;
 
   constructor() {
@@ -82,6 +92,7 @@ class InMemoryDatabase {
     this.orders.clear();
     this.changeLog = [];
     this.appliedMutations.clear();
+    this.uploadedImages.clear();
     this.seqCounter = 0;
     this.seedDemoWorkspace();
   }

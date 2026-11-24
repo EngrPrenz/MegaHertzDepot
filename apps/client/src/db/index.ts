@@ -19,6 +19,7 @@ export interface ProductLocal {
   warranty?: string;
   specs?: HardwareSpecs;
   imageUrl?: string;
+  publicStock?: number;
   nameHlc: string;
   skuHlc?: string;
   priceHlc?: string;
