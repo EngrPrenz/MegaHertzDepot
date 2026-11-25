@@ -9,13 +9,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['theme-init.js', 'favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'MegaHertz Depot — Offline PC Hardware POS',
+        name: 'MegaHertz Depot | PC Hardware POS',
         short_name: 'MegaHertz POS',
         description: 'Offline-first computer hardware POS, custom rig builder, and stock sync',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

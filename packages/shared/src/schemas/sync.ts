@@ -33,6 +33,24 @@ export const hlcStringSchema = z
   .regex(/^\d{1,15}:\d{1,6}:.+$/, 'Invalid HLC format')
   .max(120);
 
+export const safeImageUrlSchema = z
+  .string()
+  .max(2000)
+  .refine(
+    (val) => {
+      const trimmed = val.trim();
+      if (!trimmed) return true;
+      if (trimmed.startsWith('//')) return false;
+      return (
+        trimmed.startsWith('/') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('local-img://')
+      );
+    },
+    { message: 'Invalid image URL scheme' }
+  );
+
 export const productCreatePayloadSchema = z.object({
   id: z.string().uuid(),
   storeId: z.string().uuid(),
@@ -44,7 +62,7 @@ export const productCreatePayloadSchema = z.object({
   costPrice: z.number().min(0).optional().nullable(),
   warranty: z.string().max(120).optional().nullable(),
   specs: hardwareSpecsSchema,
-  imageUrl: z.string().max(2000).optional().nullable(),
+  imageUrl: safeImageUrlSchema.optional().nullable(),
   nameHlc: hlcStringSchema,
   skuHlc: hlcStringSchema.optional(),
   priceHlc: hlcStringSchema.optional(),
@@ -62,7 +80,7 @@ export const productUpdatePayloadSchema = z.object({
   costPrice: z.number().min(0).optional().nullable(),
   warranty: z.string().max(120).optional().nullable(),
   specs: hardwareSpecsSchema,
-  imageUrl: z.string().max(2000).optional().nullable(),
+  imageUrl: safeImageUrlSchema.optional().nullable(),
   nameHlc: hlcStringSchema.optional(),
   skuHlc: hlcStringSchema.optional(),
   priceHlc: hlcStringSchema.optional(),
@@ -86,18 +104,18 @@ export const adjustmentCreatePayloadSchema = z.object({
   localStockAtCount: z.number().int().optional(),
   createdAt: z.number(),
   hlc: hlcStringSchema,
-  deviceId: z.string(),
+  deviceId: z.string().min(1).max(120),
 });
 
 export const saleOrderItemSchema = z.object({
   productId: z.string().uuid(),
-  productName: z.string().min(1),
-  sku: z.string().optional().nullable(),
+  productName: z.string().min(1).max(255),
+  sku: z.string().max(100).optional().nullable(),
   category: hardwareCategorySchema.optional(),
-  warranty: z.string().optional().nullable(),
-  quantity: z.number().int().min(1),
+  warranty: z.string().max(120).optional().nullable(),
+  quantity: z.number().int().min(1).max(9999),
   unitPrice: z.number().min(0),
-  serialNumbers: z.array(z.string()).optional(),
+  serialNumbers: z.array(z.string().max(100)).max(50).optional(),
 });
 
 export const orderCreatePayloadSchema = z.object({
@@ -106,7 +124,7 @@ export const orderCreatePayloadSchema = z.object({
   receiptNumber: z.string().min(1).max(60),
   customerName: z.string().max(120).optional().nullable(),
   customerPhone: z.string().max(60).optional().nullable(),
-  items: z.array(saleOrderItemSchema).min(1),
+  items: z.array(saleOrderItemSchema).min(1).max(100),
   subtotal: z.number().min(0),
   discountAmount: z.number().min(0),
   taxRate: z.number().min(0).max(100),
@@ -119,13 +137,13 @@ export const orderCreatePayloadSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
   createdAt: z.number(),
   hlc: hlcStringSchema,
-  deviceId: z.string(),
+  deviceId: z.string().min(1).max(120),
 });
 
 export const orderUpdatePayloadSchema = z.object({
   id: z.string().uuid(),
   storeId: z.string().uuid(),
-  items: z.array(saleOrderItemSchema).min(1).optional(),
+  items: z.array(saleOrderItemSchema).min(1).max(100).optional(),
   notes: z.string().max(2000).optional().nullable(),
   hlc: hlcStringSchema,
 });
@@ -149,7 +167,7 @@ export const mutationItemSchema = z.object({
 });
 
 export const syncPushRequestSchema = z.object({
-  deviceId: z.string().min(1),
+  deviceId: z.string().min(1).max(120),
   mutations: z.array(mutationItemSchema).max(200),
 });
 

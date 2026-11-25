@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { SyncService } from '../services/sync.service.js';
+import { config } from '../config.js';
 import { syncPushRequestSchema, syncPullQuerySchema } from '@countwise/shared';
 
 export class SyncController {
@@ -22,8 +23,15 @@ export class SyncController {
       const response = await SyncService.push(req.user.id, validated.data);
       res.status(200).json(response);
     } catch (error: any) {
-      res.status(error.status || 500).json({
-        error: error.message || 'Sync push failed',
+      const status = error.status || 500;
+      if (status >= 500) {
+        console.error('Sync push error:', error);
+      }
+      res.status(status).json({
+        error:
+          config.NODE_ENV === 'production' && status >= 500
+            ? 'Internal Server Error'
+            : error.message || 'Sync push failed',
       });
     }
   }
@@ -47,8 +55,15 @@ export class SyncController {
       const response = await SyncService.pull(req.user.id, validated.data);
       res.status(200).json(response);
     } catch (error: any) {
-      res.status(error.status || 500).json({
-        error: error.message || 'Sync pull failed',
+      const status = error.status || 500;
+      if (status >= 500) {
+        console.error('Sync pull error:', error);
+      }
+      res.status(status).json({
+        error:
+          config.NODE_ENV === 'production' && status >= 500
+            ? 'Internal Server Error'
+            : error.message || 'Sync pull failed',
       });
     }
   }

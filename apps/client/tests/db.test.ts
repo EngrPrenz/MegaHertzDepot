@@ -8,6 +8,9 @@ import {
   resolveEffectiveStock,
   syncPublicCatalog,
   decrementCachedPublicStock,
+  buildStockMap,
+  buildAdjustmentStockMap,
+  safeJsonParse,
 } from '../src/services/publicCatalogSync.js';
 
 describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
@@ -440,5 +443,62 @@ describe('Dexie Client Database, Offline CRUD & Schema Migrations', () => {
     const afterDecrement = await db.products.get(productId);
     expect(afterDecrement?.publicStock).toBe(10);
     expect(resolveEffectiveStock(afterDecrement!, [])).toBe(10);
+  });
+
+  it('should compute customer stock maps and adjustment stock maps accurately, and safely parse JSON', () => {
+    const products = [
+      { id: 'p-1', publicStock: 12 },
+      { id: 'p-2', publicStock: 4 },
+      { id: 'p-3' },
+    ];
+    const adjustments = [
+      {
+        id: 'adj-a',
+        productId: 'p-2',
+        storeId,
+        delta: 10,
+        reason: 'restock' as const,
+        createdAt: 1000,
+        hlc: '001',
+        deviceId: 'pos-1',
+        userId,
+      },
+      {
+        id: 'adj-b',
+        productId: 'p-2',
+        storeId,
+        delta: -3,
+        reason: 'sale' as const,
+        createdAt: 2000,
+        hlc: '002',
+        deviceId: 'pos-1',
+        userId,
+      },
+      {
+        id: 'adj-c',
+        productId: 'p-3',
+        storeId,
+        delta: 5,
+        reason: 'restock' as const,
+        createdAt: 3000,
+        hlc: '003',
+        deviceId: 'pos-1',
+        userId,
+      },
+    ];
+
+    const customerStock = buildStockMap(products, adjustments);
+    expect(customerStock.get('p-1')).toBe(12);
+    expect(customerStock.get('p-2')).toBe(7); // adjustments override publicStock
+    expect(customerStock.get('p-3')).toBe(5);
+
+    const terminalStock = buildAdjustmentStockMap(products, adjustments);
+    expect(terminalStock.get('p-1')).toBe(0); // terminal mode ignores publicStock when 0 adjustments
+    expect(terminalStock.get('p-2')).toBe(7);
+    expect(terminalStock.get('p-3')).toBe(5);
+
+    expect(safeJsonParse('{"ok":true}', { ok: false })).toEqual({ ok: true });
+    expect(safeJsonParse('not-json', { fallback: 1 })).toEqual({ fallback: 1 });
+    expect(safeJsonParse(null, ['default'])).toEqual(['default']);
   });
 });

@@ -15,6 +15,15 @@ import { extractLocalImageId, isLocalImageUri } from './imageService.js';
 export const DEFAULT_STORE_FALLBACK = '22222222-2222-2222-2222-222222222222';
 export const PUBLIC_CATALOG_REFRESH_EVENT = 'megahertz-public-catalog-refresh';
 
+export function safeJsonParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * Resolves effective display stock for a product:
  * uses local adjustment deltas when present (staff terminal or local counts),
@@ -31,6 +40,48 @@ export function resolveEffectiveStock(
     return product.publicStock;
   }
   return 0;
+}
+
+function groupAdjustmentsByProduct(adjustments: AdjustmentLocal[]): Map<string, AdjustmentLocal[]> {
+  const grouped = new Map<string, AdjustmentLocal[]>();
+  for (const adj of adjustments) {
+    const list = grouped.get(adj.productId);
+    if (list) list.push(adj);
+    else grouped.set(adj.productId, [adj]);
+  }
+  return grouped;
+}
+
+/**
+ * Builds a productId -> effective stock map for customer views in O(N + A),
+ * preferring local adjustment deltas and falling back to synced `publicStock`.
+ */
+export function buildStockMap(
+  products: Array<Pick<ProductLocal, 'id' | 'publicStock'>>,
+  adjustments: AdjustmentLocal[]
+): Map<string, number> {
+  const grouped = groupAdjustmentsByProduct(adjustments);
+  const map = new Map<string, number>();
+  for (const product of products) {
+    map.set(product.id, resolveEffectiveStock(product, grouped.get(product.id) ?? []));
+  }
+  return map;
+}
+
+/**
+ * Builds a productId -> derived stock map strictly from local `adjustments`
+ * for staff operational views (POS, Inventory, Quick Count).
+ */
+export function buildAdjustmentStockMap(
+  products: Array<Pick<ProductLocal, 'id'>>,
+  adjustments: AdjustmentLocal[]
+): Map<string, number> {
+  const grouped = groupAdjustmentsByProduct(adjustments);
+  const map = new Map<string, number>();
+  for (const product of products) {
+    map.set(product.id, computeDerivedStock(grouped.get(product.id) ?? []));
+  }
+  return map;
 }
 
 interface RemoteCatalogProduct {

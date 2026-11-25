@@ -22,7 +22,13 @@ if (typeof cleanupInterval.unref === 'function') {
   cleanupInterval.unref();
 }
 
-export function createRateLimiter(options: { windowMs: number; max: number }) {
+const MAX_BUCKETS = 10_000;
+
+export function createRateLimiter(options: {
+  windowMs: number;
+  max: number;
+  keyPrefix?: string;
+}) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (process.env.NODE_ENV === 'test') {
       next();
@@ -30,11 +36,20 @@ export function createRateLimiter(options: { windowMs: number; max: number }) {
     }
 
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `${req.baseUrl}:${ip}`;
+    const key = `${options.keyPrefix || req.baseUrl}:${ip}`;
     const now = Date.now();
 
     if (buckets.size > 5000) {
       pruneExpiredBuckets(now);
+    }
+
+    if (buckets.size >= MAX_BUCKETS) {
+      for (const oldKey of buckets.keys()) {
+        buckets.delete(oldKey);
+        if (buckets.size < MAX_BUCKETS) {
+          break;
+        }
+      }
     }
 
     let bucket = buckets.get(key);

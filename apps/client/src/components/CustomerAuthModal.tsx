@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
 import { ModalDialog } from './ModalDialog.js';
 import { Mail, Lock, User, ArrowRight, AlertTriangle, ShieldCheck } from 'lucide-react';
-
-interface CustomerUser {
-  id: string;
-  email: string;
-  name?: string;
-  phone?: string;
-  address?: string;
-}
+import type { CustomerUser } from '../hooks/useCustomerCart.js';
 
 interface CustomerAuthModalProps {
   open: boolean;
@@ -36,7 +29,6 @@ export function CustomerAuthModal({
     e.preventDefault();
     setError(null);
 
-    // Guest checkout flow: no password needed
     if (mode === 'guest') {
       if (!email.trim() || !name.trim()) {
         setError('Please provide your name and email address for order updates.');
@@ -85,7 +77,6 @@ export function CustomerAuthModal({
       const data = await res.json();
 
       if (!res.ok) {
-        // Fallback for offline or demo customer mode
         if (data.error && data.error.includes('already exists') && mode === 'register') {
           throw new Error('An account with this email already exists. Please sign in instead.');
         }
@@ -106,7 +97,6 @@ export function CustomerAuthModal({
       onSuccess(customer, data.accessToken);
       onClose();
     } catch (err: any) {
-      // If offline or network unavailable, allow smooth guest offline authentication
       if (err.message && (err.message.includes('fetch') || err.message.includes('Failed to fetch'))) {
         const fallbackId = `offline_cust_${Date.now()}`;
         const fallbackUser: CustomerUser = {
@@ -138,21 +128,20 @@ export function CustomerAuthModal({
           ? 'Create Customer Account'
           : 'Quick Checkout Details'
       }
-      subtitle="Sign in or provide your details to add items to cart and track orders"
+      subtitle="Sign in or enter your contact details to place and track orders."
     >
       <div className="space-y-4">
-        {/* Mode Switcher Tabs */}
-        <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs font-semibold">
+        <div className="flex rounded-md bg-zinc-100 dark:bg-carbon-elevated p-1 border border-zinc-200 dark:border-zinc-800 text-xs font-medium">
           <button
             type="button"
             onClick={() => {
               setMode('login');
               setError(null);
             }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
+            className={`flex-1 py-1.5 rounded transition-colors cursor-pointer ${
               mode === 'login'
-                ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                : 'text-stone-400 hover:text-white'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-zinc-50 font-semibold shadow-xs border border-zinc-200 dark:border-zinc-700'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
             }`}
           >
             Sign In
@@ -163,10 +152,10 @@ export function CustomerAuthModal({
               setMode('register');
               setError(null);
             }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
+            className={`flex-1 py-1.5 rounded transition-colors cursor-pointer ${
               mode === 'register'
-                ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                : 'text-stone-400 hover:text-white'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-zinc-50 font-semibold shadow-xs border border-zinc-200 dark:border-zinc-700'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
             }`}
           >
             Register
@@ -177,19 +166,19 @@ export function CustomerAuthModal({
               setMode('guest');
               setError(null);
             }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
+            className={`flex-1 py-1.5 rounded transition-colors cursor-pointer ${
               mode === 'guest'
-                ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                : 'text-stone-400 hover:text-white'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-zinc-50 font-semibold shadow-xs border border-zinc-200 dark:border-zinc-700'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100'
             }`}
           >
-            Guest Checkout
+            Guest
           </button>
         </div>
 
         {error && (
-          <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+          <div className="p-3 rounded-md bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-700 dark:text-rose-400" strokeWidth={1.75} />
             <span>{error}</span>
           </div>
         )}
@@ -197,103 +186,128 @@ export function CustomerAuthModal({
         <form onSubmit={handleSubmit} className="space-y-3.5">
           {mode !== 'login' && (
             <div>
-              <label className="block text-xs font-medium text-stone-400 mb-1">Full Name *</label>
+              <label htmlFor="cust-name" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Full Name *
+              </label>
               <div className="relative">
-                <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+                <User
+                  className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+                  strokeWidth={1.75}
+                />
                 <input
+                  id="cust-name"
                   type="text"
                   required
-                  placeholder="e.g. Juan dela Cruz"
+                  autoComplete="name"
+                  placeholder="Juan dela Cruz"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+                  className="w-full pl-9 pr-3 py-2 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded text-sm text-zinc-950 dark:text-zinc-50 placeholder-zinc-400 focus:outline-none focus:border-amber-600 dark:focus:border-amber-500"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-medium text-stone-400 mb-1">Email Address *</label>
+            <label htmlFor="cust-email" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              Email Address *
+            </label>
             <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+              <Mail
+                className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+                strokeWidth={1.75}
+              />
               <input
+                id="cust-email"
                 type="email"
                 required
+                autoComplete="email"
                 placeholder="juan@example.ph"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+                className="w-full pl-9 pr-3 py-2 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded text-sm text-zinc-950 dark:text-zinc-50 placeholder-zinc-400 focus:outline-none focus:border-amber-600 dark:focus:border-amber-500"
               />
             </div>
           </div>
 
           {mode !== 'guest' ? (
             <div>
-              <label className="block text-xs font-medium text-stone-400 mb-1">Password *</label>
+              <label htmlFor="cust-password" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Password *
+              </label>
               <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+                <Lock
+                  className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
+                  strokeWidth={1.75}
+                />
                 <input
+                  id="cust-password"
                   type="password"
                   required
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+                  className="w-full pl-9 pr-3 py-2 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded text-sm text-zinc-950 dark:text-zinc-50 placeholder-zinc-400 focus:outline-none focus:border-amber-600 dark:focus:border-amber-500"
                 />
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-stone-400 mb-1">
-                  Mobile Number (for delivery & order updates)
+                <label htmlFor="cust-phone" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Mobile Number (for order updates)
                 </label>
                 <input
+                  id="cust-phone"
                   type="tel"
+                  autoComplete="tel"
                   placeholder="0917-123-4567"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded text-sm text-zinc-950 dark:text-zinc-50 placeholder-zinc-400 focus:outline-none focus:border-amber-600 dark:focus:border-amber-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-stone-400 mb-1">
+                <label htmlFor="cust-address" className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                   Delivery Address (optional)
                 </label>
                 <input
+                  id="cust-address"
                   type="text"
+                  autoComplete="street-address"
                   placeholder="Street, City, Metro Manila"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-sm text-white focus:outline-none focus:border-amber-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded text-sm text-zinc-950 dark:text-zinc-50 placeholder-zinc-400 focus:outline-none focus:border-amber-600 dark:focus:border-amber-500"
                 />
               </div>
             </div>
           )}
 
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-stone-950 font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-950/40 transition disabled:opacity-50"
+              className="w-full py-2.5 bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white active:scale-[0.99] text-white dark:text-zinc-950 font-semibold rounded-md text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
             >
               <span>
                 {loading
                   ? 'Processing...'
                   : mode === 'login'
-                  ? 'Sign In & Continue Shopping'
+                  ? 'Sign In & Continue'
                   : mode === 'register'
                   ? 'Create Account & Continue'
                   : 'Continue as Guest'}
               </span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4" strokeWidth={1.75} />
             </button>
           </div>
         </form>
 
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-stone-500 pt-2 border-t border-stone-800">
-          <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-          <span>Your customer details are securely encrypted and protected.</span>
+        <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400 pt-2.5 border-t border-zinc-200 dark:border-zinc-800">
+          <ShieldCheck className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
+          <span>Customer details are kept private for order fulfillment.</span>
         </div>
       </div>
     </ModalDialog>

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb, ProductLocal, SaleOrderLocal } from '../db/index.js';
 import { localRepository } from '../services/localRepository.js';
+import { buildAdjustmentStockMap } from '../services/publicCatalogSync.js';
 import { ReceiptQuoteModal } from '../components/ReceiptQuoteModal.js';
 import { ProductImage } from '../components/ProductImage.js';
 import {
@@ -18,7 +19,7 @@ import {
   Trash2,
   Cpu,
   ShieldCheck,
-  Sparkles,
+  PackagePlus,
   CreditCard,
   Banknote,
   Smartphone,
@@ -97,13 +98,10 @@ export function PosRegisterPage({
     []
   );
 
-  const stockByProduct = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const adj of adjustments) {
-      map.set(adj.productId, (map.get(adj.productId) || 0) + adj.delta);
-    }
-    return map;
-  }, [adjustments]);
+  const stockByProduct = useMemo(
+    () => buildAdjustmentStockMap(products, adjustments),
+    [products, adjustments]
+  );
 
   const catalogItems = useMemo(() => {
     return products
@@ -218,7 +216,6 @@ export function PosRegisterPage({
 
   const taxAmount = useMemo(() => {
     if (taxInclusive) {
-      // 12% VAT already included in retail prices: VAT = Total - (Total / 1.12)
       return Math.round((netAfterDiscount - netAfterDiscount / (1 + taxRate / 100)) * 100) / 100;
     }
     return Math.round(netAfterDiscount * (taxRate / 100) * 100) / 100;
@@ -317,19 +314,17 @@ export function PosRegisterPage({
     const code = rawCode.trim().toLowerCase();
     if (!code) return false;
 
-    // 1. Exact SKU match
     const exactSkuMatch = products.find((p) => p.sku && p.sku.toLowerCase() === code);
     if (exactSkuMatch) {
       addToCart(exactSkuMatch);
       setScanFeedback({
         type: 'success',
-        text: `Scanned [${exactSkuMatch.sku}] • Added "${exactSkuMatch.name}" to cart`,
+        text: `Scanned [${exactSkuMatch.sku}]: added "${exactSkuMatch.name}"`,
       });
       setTimeout(() => setScanFeedback(null), 3000);
       return true;
     }
 
-    // 2. Single filtered match or partial SKU match
     const partialSkuMatch = products.filter(
       (p) =>
         (p.sku && p.sku.toLowerCase().includes(code)) ||
@@ -340,7 +335,7 @@ export function PosRegisterPage({
       addToCart(target);
       setScanFeedback({
         type: 'success',
-        text: `Matched [${target.sku || target.name}] • Added "${target.name}" to cart`,
+        text: `Matched [${target.sku || target.name}]: added "${target.name}"`,
       });
       setTimeout(() => setScanFeedback(null), 3000);
       return true;
@@ -350,14 +345,13 @@ export function PosRegisterPage({
       type: 'error',
       text:
         partialSkuMatch.length > 1
-          ? `Multiple items match "${rawCode.trim()}" — click the desired item below`
+          ? `Multiple items match "${rawCode.trim()}" - select the item below`
           : `No hardware SKU found matching barcode "${rawCode.trim()}"`,
     });
     setTimeout(() => setScanFeedback(null), 3500);
     return false;
   };
 
-  // Global USB Keyboard-Wedge Barcode Scanner Listener (detects rapid keystrokes < 60ms apart ending in Enter)
   useEffect(() => {
     if (!scannerMode) return;
 
@@ -408,7 +402,10 @@ export function PosRegisterPage({
         {/* Search, Barcode Scanner Toggle & Seed Bar */}
         <div className="flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
+            <Search
+              className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2"
+              strokeWidth={1.75}
+            />
             <input
               type="text"
               value={search}
@@ -422,7 +419,7 @@ export function PosRegisterPage({
               }}
               placeholder="Scan barcode / SKU or search hardware (press Enter to quick-add)..."
               data-testid="pos-search-input"
-              className="w-full bg-stone-900/90 border border-stone-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
+              className="w-full bg-white dark:bg-carbon border border-zinc-300 dark:border-zinc-700 rounded px-3.5 pl-9 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
             />
           </div>
 
@@ -430,12 +427,13 @@ export function PosRegisterPage({
             type="button"
             onClick={() => setScannerMode((v) => !v)}
             title="Toggle USB / Keyboard-Wedge Barcode Scanner Listener"
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer shrink-0 ${scannerMode
-              ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
-              : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-white'
-              }`}
+            className={`px-3.5 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 border transition-colors cursor-pointer shrink-0 ${
+              scannerMode
+                ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-300 dark:border-amber-500/50 text-amber-800 dark:text-amber-300'
+                : 'bg-white dark:bg-carbon border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white'
+            }`}
           >
-            <Barcode className="w-4 h-4 text-amber-400" />
+            <Barcode className="w-4 h-4 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
             <span>{scannerMode ? 'Scanner Active' : 'Scanner Paused'}</span>
           </button>
 
@@ -445,10 +443,10 @@ export function PosRegisterPage({
               onClick={handleSeedCatalog}
               disabled={seeding}
               data-testid="seed-hardware-btn"
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-950/40 cursor-pointer shrink-0"
+              className="px-4 py-2 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>{seeding ? 'Seeding...' : 'Seed Sample PC Hardware'}</span>
+              <PackagePlus className="w-4 h-4" strokeWidth={1.75} />
+              <span>{seeding ? 'Seeding...' : 'Seed Sample Hardware'}</span>
             </button>
           )}
         </div>
@@ -456,29 +454,31 @@ export function PosRegisterPage({
         {/* Live Barcode Scan Feedback Banner */}
         {scanFeedback && (
           <div
-            className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 ${scanFeedback.type === 'success'
-              ? 'bg-emerald-950/60 border-emerald-700/70 text-emerald-200'
-              : 'bg-amber-950/60 border-amber-700/70 text-amber-200'
-              }`}
+            className={`px-3.5 py-2 rounded-md border text-xs font-medium flex items-center gap-2 ${
+              scanFeedback.type === 'success'
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+                : 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+            }`}
           >
             {scanFeedback.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" strokeWidth={1.75} />
             ) : (
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" strokeWidth={1.75} />
             )}
             <span>{scanFeedback.text}</span>
           </div>
         )}
 
         {/* Hardware Category Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={() => setSelectedCategory('All')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors cursor-pointer ${selectedCategory === 'All'
-              ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-              : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
-              }`}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
+              selectedCategory === 'All'
+                ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
+                : 'bg-white dark:bg-carbon text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+            }`}
           >
             All Parts ({products.length})
           </button>
@@ -487,30 +487,30 @@ export function PosRegisterPage({
               key={cat}
               type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition-colors cursor-pointer ${selectedCategory === cat
-                ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
-                }`}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
+                selectedCategory === cat
+                  ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
+                  : 'bg-white dark:bg-carbon text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
             >
               {cat}
             </button>
           ))}
         </div>
 
-        {/* Empty State with 1-Click Sample Hardware Seeder */}
+        {/* Empty State or Product Catalog Grid */}
         {products.length === 0 ? (
-          <div className="glass-panel rounded-2xl p-8 text-center space-y-4 border border-amber-500/20">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
-              <Cpu className="w-7 h-7" />
+          <div className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg p-8 text-center space-y-4">
+            <div className="w-12 h-12 rounded-md bg-zinc-100 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 flex items-center justify-center mx-auto">
+              <Cpu className="w-6 h-6" strokeWidth={1.75} />
             </div>
             <div className="max-w-md mx-auto space-y-1">
-              <h3 className="text-base font-bold text-white">
-                Welcome to MegaHertz Depot POS
+              <h3 className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
+                Load Branch PC Hardware Catalog
               </h3>
-              <p className="text-xs text-stone-400 leading-relaxed">
-                Load our curated 14-item PC Hardware Catalog (Ryzen 7 7800X3D, Core i5-14600K, RTX
-                4070 Super, AM5 & LGA1700 Motherboards, DDR5/DDR4 RAM, NVMe SSD, PSU, Case &
-                Peripherals) to test offline POS checkout and PC Rig building immediately.
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                Seed the sample PC hardware catalog to ring up sales, record serial numbers, and
+                issue receipts offline.
               </p>
             </div>
             <button
@@ -518,23 +518,24 @@ export function PosRegisterPage({
               onClick={handleSeedCatalog}
               disabled={seeding}
               data-testid="empty-seed-hardware-btn"
-              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs sm:text-sm font-bold inline-flex items-center gap-2 shadow-lg shadow-amber-950/40 cursor-pointer"
+              className="px-4 py-2 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950 text-xs sm:text-sm font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>Seed Sample PC Hardware Catalog (14 Items)</span>
+              <PackagePlus className="w-4 h-4" strokeWidth={1.75} />
+              <span>Seed Sample PC Hardware Catalog</span>
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[68vh] overflow-y-auto pr-1">
             {catalogItems.map(({ product, stock }) => {
-              const isOversold = stock < 0;
-              const isLowStock = stock <= lowStockThreshold;
+              const isOutOfStock = stock <= 0;
+              const isLow = stock > 0 && stock <= lowStockThreshold;
               return (
-                <div
+                <button
                   key={product.id}
+                  type="button"
                   onClick={() => addToCart(product)}
                   data-testid={`pos-card-${product.sku || product.name}`}
-                  className="glass-panel-interactive rounded-2xl p-3.5 flex flex-col justify-between gap-3 cursor-pointer group"
+                  className="text-left group bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 rounded-lg p-3.5 flex flex-col justify-between gap-3 cursor-pointer transition-colors"
                 >
                   <div className="flex items-start gap-3">
                     <ProductImage
@@ -542,39 +543,39 @@ export function PosRegisterPage({
                       sku={product.sku}
                       name={product.name}
                       category={product.category}
-                      className="w-14 h-14 rounded-xl shrink-0 group-hover:scale-105 transition-transform"
+                      className="w-16 h-16 shrink-0"
                     />
-
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-stone-950 text-amber-400 border border-amber-500/30 truncate">
-                          {product.category || 'Hardware'}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 truncate">
+                          {product.sku || product.category}
                         </span>
                         <span
-                          className={`text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded-full shrink-0 ${isOversold
-                            ? 'bg-red-950/80 text-red-300 border border-red-800'
-                            : isLowStock
-                              ? 'bg-amber-950/80 text-amber-300 border border-amber-800'
-                              : 'bg-stone-950 text-stone-300 border border-stone-800'
-                            }`}
+                          className={`text-[11px] font-medium px-1.5 py-0.5 rounded border tabular-nums shrink-0 ${
+                            isOutOfStock
+                              ? 'bg-red-50 dark:bg-rose-950/60 text-red-700 dark:text-rose-300 border-red-200 dark:border-rose-800'
+                              : isLow
+                              ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                              : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                          }`}
                         >
-                          {isOversold ? `Oversold (${stock})` : `${stock} in stock`}
+                          {stock} in stock
                         </span>
                       </div>
 
-                      <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors line-clamp-2 leading-tight">
+                      <h4 className="text-xs sm:text-sm font-semibold text-zinc-950 dark:text-zinc-50 line-clamp-2 leading-snug">
                         {product.name}
                       </h4>
 
-                      <div className="flex items-center flex-wrap gap-1 text-[9px] text-stone-400 font-mono">
+                      <div className="flex items-center flex-wrap gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
                         {product.brand && <span>{product.brand}</span>}
                         {product.specs?.socket && (
-                          <span className="px-1.5 py-0.2 rounded bg-stone-800 text-stone-300 border border-stone-700/60">
+                          <span className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-carbon-elevated text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-mono text-[10px]">
                             {product.specs.socket}
                           </span>
                         )}
                         {product.specs?.ramType && (
-                          <span className="px-1.5 py-0.2 rounded bg-stone-800 text-stone-300 border border-stone-700/60">
+                          <span className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-carbon-elevated text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-mono text-[10px]">
                             {product.specs.ramType}
                           </span>
                         )}
@@ -582,24 +583,27 @@ export function PosRegisterPage({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-stone-800/80">
+                  <div className="flex items-center justify-between pt-2.5 border-t border-zinc-100 dark:border-zinc-800">
                     <div>
-                      <div className="text-sm font-extrabold text-amber-400 font-mono tabular-nums">
+                      <div className="text-sm font-bold text-zinc-950 dark:text-zinc-50 font-mono tabular-nums">
                         {formatCurrency(product.price || 0, currencySymbol)}
                       </div>
                       {product.warranty && (
-                        <div className="text-[9px] text-stone-500 flex items-center gap-1">
-                          <ShieldCheck className="w-2.5 h-2.5 text-amber-500/80" />
-                          <span className="truncate max-w-[120px]">{product.warranty}</span>
+                        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+                          <ShieldCheck
+                            className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0"
+                            strokeWidth={1.75}
+                          />
+                          <span className="truncate max-w-[140px]">{product.warranty}</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 group-hover:bg-amber-500 text-amber-300 group-hover:text-stone-950 flex items-center justify-center transition-colors">
-                      <Plus className="w-4 h-4" />
-                    </div>
+                    <span className="w-8 h-8 rounded-md bg-zinc-100 dark:bg-carbon-elevated group-hover:bg-zinc-950 dark:group-hover:bg-zinc-100 text-zinc-700 dark:text-zinc-200 group-hover:text-white dark:group-hover:text-zinc-950 flex items-center justify-center transition-colors">
+                      <Plus className="w-4 h-4" strokeWidth={1.75} />
+                    </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -607,21 +611,21 @@ export function PosRegisterPage({
       </div>
 
       {/* Right 5 Columns: Active Register Cart & Checkout */}
-      <div className="lg:col-span-5 glass-panel rounded-2xl p-5 flex flex-col justify-between space-y-4 self-start sticky top-20 border border-stone-800">
-        <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+      <div className="lg:col-span-5 bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 flex flex-col justify-between space-y-4 self-start sticky top-16">
+        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
           <div className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-amber-400" />
-            <h3 className="text-base font-bold text-white">
-              POS Register Cart ({cart.reduce((s, i) => s + i.quantity, 0)})
+            <ShoppingCart className="w-4 h-4 text-zinc-800 dark:text-zinc-200" strokeWidth={1.75} />
+            <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+              Register Cart ({cart.reduce((s, i) => s + i.quantity, 0)})
             </h3>
           </div>
           {cart.length > 0 && (
             <button
               type="button"
               onClick={() => setCart([])}
-              className="text-xs text-stone-400 hover:text-rose-400 flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-red-700 dark:hover:text-rose-400 flex items-center gap-1 cursor-pointer transition-colors"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.75} />
               <span>Clear</span>
             </button>
           )}
@@ -629,10 +633,10 @@ export function PosRegisterPage({
 
         {/* Cart Items List */}
         {cart.length === 0 ? (
-          <div className="py-12 text-center space-y-2 text-stone-500">
-            <ShoppingCart className="w-8 h-8 mx-auto opacity-40 text-stone-600" />
+          <div className="py-10 text-center space-y-2 text-zinc-500 dark:text-zinc-400">
+            <ShoppingCart className="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-700" strokeWidth={1.75} />
             <p className="text-xs">
-              Click any hardware component on the left to add it to the current sale.
+              Select any hardware component on the left to add it to this transaction.
             </p>
           </div>
         ) : (
@@ -643,32 +647,32 @@ export function PosRegisterPage({
               return (
                 <div
                   key={item.product.id}
-                  className="p-3 rounded-xl bg-stone-900/90 border border-stone-800 space-y-2 text-xs"
+                  className="p-3 rounded-md bg-zinc-50 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-semibold text-white truncate">
+                      <div className="font-semibold text-zinc-950 dark:text-zinc-50 truncate">
                         {item.product.name}
                       </div>
-                      <div className="text-[11px] text-stone-400">
-                        {formatCurrency(item.product.price || 0, currencySymbol)} each •{' '}
-                        <span className="text-amber-400/90">
+                      <div className="text-[11px] text-zinc-600 dark:text-zinc-400 tabular-nums">
+                        {formatCurrency(item.product.price || 0, currencySymbol)} each |{' '}
+                        <span className="text-zinc-500 dark:text-zinc-400">
                           {item.product.warranty || '1 Yr Warranty'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-right font-bold text-amber-400 font-mono shrink-0">
+                    <div className="text-right font-bold text-zinc-950 dark:text-zinc-50 font-mono tabular-nums shrink-0">
                       {formatCurrency((item.product.price || 0) * item.quantity, currencySymbol)}
                     </div>
                   </div>
 
                   {willOversell && (
-                    <div className="text-[10px] text-amber-300 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                    <div className="text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 rounded px-2 py-1 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" strokeWidth={1.75} />
                       <span>
                         Offline sale allowed: local stock ({currentStock}) will go negative and
-                        flag a backorder alert on sync.
+                        flag a backorder check on sync.
                       </span>
                     </div>
                   )}
@@ -677,9 +681,9 @@ export function PosRegisterPage({
                     <button
                       type="button"
                       onClick={() => toggleSerialInput(item.product.id)}
-                      className="text-[11px] text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                      className="text-[11px] font-medium text-amber-800 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <Barcode className="w-3.5 h-3.5" />
+                      <Barcode className="w-3.5 h-3.5" strokeWidth={1.75} />
                       <span>
                         {item.showSerialInput
                           ? 'Hide Serial Numbers (S/N)'
@@ -691,25 +695,27 @@ export function PosRegisterPage({
                       <button
                         type="button"
                         onClick={() => updateCartQty(item.product.id, -1)}
-                        className="w-7 h-7 rounded-lg bg-stone-800 hover:bg-stone-700 flex items-center justify-center text-white cursor-pointer transition-colors"
+                        aria-label={`Decrease ${item.product.name} quantity`}
+                        className="w-7 h-7 rounded bg-white dark:bg-carbon hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-800 dark:text-zinc-200 cursor-pointer transition-colors"
                       >
-                        <Minus className="w-3.5 h-3.5" />
+                        <Minus className="w-3.5 h-3.5" strokeWidth={1.75} />
                       </button>
-                      <span className="w-6 text-center font-bold font-mono tabular-nums">
+                      <span className="w-6 text-center font-bold font-mono tabular-nums text-zinc-950 dark:text-zinc-50">
                         {item.quantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => updateCartQty(item.product.id, 1)}
-                        className="w-7 h-7 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 flex items-center justify-center text-amber-300 cursor-pointer transition-colors"
+                        aria-label={`Increase ${item.product.name} quantity`}
+                        className="w-7 h-7 rounded bg-white dark:bg-carbon hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-800 dark:text-zinc-200 cursor-pointer transition-colors"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3.5 h-3.5" strokeWidth={1.75} />
                       </button>
                     </div>
                   </div>
 
                   {item.showSerialInput && (
-                    <div className="space-y-1.5 pt-1.5 border-t border-stone-800/80">
+                    <div className="space-y-1.5 pt-1.5 border-t border-zinc-200 dark:border-zinc-800">
                       {item.serialNumbers.map((sn, idx) => (
                         <input
                           key={idx}
@@ -719,7 +725,7 @@ export function PosRegisterPage({
                             updateSerialNumber(item.product.id, idx, e.target.value)
                           }
                           placeholder={`Unit #${idx + 1} Serial Number (S/N) for Warranty`}
-                          className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1 text-[11px] font-mono text-amber-200 placeholder-stone-600 focus:outline-none focus:border-amber-500"
+                          className="w-full bg-white dark:bg-carbon border border-zinc-300 dark:border-zinc-700 rounded px-2.5 py-1 text-[11px] font-mono text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
                         />
                       ))}
                     </div>
@@ -731,21 +737,23 @@ export function PosRegisterPage({
         )}
 
         {/* Checkout Payment & Customer Form */}
-        <form onSubmit={handleCompleteSale} className="space-y-3 pt-3 border-t border-stone-800">
+        <form onSubmit={handleCompleteSale} className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
           <div className="grid grid-cols-2 gap-2">
             <input
               type="text"
+              aria-label="Customer Name (Optional)"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Customer Name (Optional)"
-              className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+              className="bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
             />
             <input
               type="text"
+              aria-label="Phone or Contact"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
               placeholder="Phone / Contact"
-              className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+              className="bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
             />
           </div>
 
@@ -753,41 +761,50 @@ export function PosRegisterPage({
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-stone-400">Discount</span>
-                <div className="flex rounded-lg bg-stone-950 p-0.5 border border-stone-800 text-[10px]">
+                <label htmlFor="pos-discount-input" className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                  Discount
+                </label>
+                <div className="flex rounded bg-zinc-100 dark:bg-carbon-elevated p-0.5 border border-zinc-200 dark:border-zinc-700 text-[10px]">
                   <button
                     type="button"
                     onClick={() => setDiscountType('fixed')}
-                    className={`px-2 py-0.5 rounded cursor-pointer ${discountType === 'fixed' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-400'
-                      }`}
+                    className={`px-2 py-0.5 rounded cursor-pointer font-semibold ${
+                      discountType === 'fixed'
+                        ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white'
+                    }`}
                   >
                     {currencySymbol}
                   </button>
                   <button
                     type="button"
                     onClick={() => setDiscountType('percent')}
-                    className={`px-2 py-0.5 rounded cursor-pointer ${discountType === 'percent' ? 'bg-amber-500 text-stone-950 font-bold' : 'text-stone-400'
-                      }`}
+                    className={`px-2 py-0.5 rounded cursor-pointer font-semibold ${
+                      discountType === 'percent'
+                        ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white'
+                    }`}
                   >
                     %
                   </button>
                 </div>
               </div>
               <input
+                id="pos-discount-input"
                 type="number"
                 min={0}
                 value={discountInput}
                 onChange={(e) => setDiscountInput(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-950 dark:text-zinc-50 font-mono tabular-nums focus:outline-none focus:border-zinc-950"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] text-stone-400 mb-1">12% VAT Mode</label>
+              <span className="block text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">12% VAT Mode</span>
               <button
                 type="button"
                 onClick={() => setTaxInclusive((v) => !v)}
-                className="w-full py-1.5 px-3 rounded-xl bg-stone-950 border border-stone-800 text-xs text-stone-200 font-medium cursor-pointer hover:border-amber-500/40 transition-colors"
+                className="w-full py-1.5 px-3 rounded bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs text-zinc-900 dark:text-zinc-100 font-medium cursor-pointer transition-colors"
               >
                 {taxInclusive ? '12% VAT Inclusive' : '12% VAT Exclusive (+12%)'}
               </button>
@@ -796,24 +813,25 @@ export function PosRegisterPage({
 
           {/* Payment Method Pills */}
           <div className="space-y-1">
-            <label className="block text-[11px] text-stone-400">Payment Method</label>
+            <span className="block text-[11px] text-zinc-600 dark:text-zinc-400">Payment Method</span>
             <div className="grid grid-cols-5 gap-1.5">
               {(['Cash', 'GCash', 'Maya', 'Card', 'Split'] as PaymentMethod[]).map((method) => (
                 <button
                   key={method}
                   type="button"
                   onClick={() => setPaymentMethod(method)}
-                  className={`py-2 rounded-xl text-[11px] font-semibold border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${paymentMethod === method
-                    ? 'bg-amber-500 text-stone-950 font-bold shadow-sm border-amber-500'
-                    : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-white hover:border-stone-700'
-                    }`}
+                  className={`py-2 rounded-md text-[11px] font-semibold border flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer ${
+                    paymentMethod === method
+                      ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 border-zinc-950 dark:border-zinc-100'
+                      : 'bg-white dark:bg-carbon-elevated border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  }`}
                 >
                   {method === 'Cash' ? (
-                    <Banknote className="w-3.5 h-3.5" />
+                    <Banknote className="w-3.5 h-3.5" strokeWidth={1.75} />
                   ) : method === 'Card' ? (
-                    <CreditCard className="w-3.5 h-3.5" />
+                    <CreditCard className="w-3.5 h-3.5" strokeWidth={1.75} />
                   ) : (
-                    <Smartphone className="w-3.5 h-3.5" />
+                    <Smartphone className="w-3.5 h-3.5" strokeWidth={1.75} />
                   )}
                   <span>{method}</span>
                 </button>
@@ -823,17 +841,18 @@ export function PosRegisterPage({
 
           {/* Tendered Input */}
           <div>
-            <div className="flex items-center justify-between text-[11px] text-stone-400 mb-1">
-              <span>Amount Tendered ({currencySymbol})</span>
+            <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400 mb-1">
+              <label htmlFor="pos-tendered-input">Amount Tendered ({currencySymbol})</label>
               <span>
                 Change Due:{' '}
-                <strong className="text-amber-400 font-mono">
+                <strong className="text-amber-800 dark:text-amber-400 font-mono tabular-nums">
                   {formatCurrency(changeDue, currencySymbol)}
                 </strong>
               </span>
             </div>
             <div className="flex items-center gap-2">
               <input
+                id="pos-tendered-input"
                 type="number"
                 min={0}
                 step="any"
@@ -844,10 +863,10 @@ export function PosRegisterPage({
                 }}
                 placeholder="Enter amount tendered..."
                 data-testid="amount-tendered-input"
-                className={`w-full bg-stone-950 border rounded-xl px-3 py-1.5 text-sm font-bold font-mono text-white focus:outline-none ${
+                className={`w-full bg-white dark:bg-carbon-elevated border rounded px-3 py-1.5 text-sm font-bold font-mono text-zinc-950 dark:text-zinc-50 tabular-nums focus:outline-none ${
                   isTenderInsufficient
-                    ? 'border-rose-500 focus:border-rose-400'
-                    : 'border-stone-800 focus:border-amber-500'
+                    ? 'border-red-500 focus:border-red-600'
+                    : 'border-zinc-300 dark:border-zinc-700 focus:border-zinc-950 dark:focus:border-amber-500'
                 }`}
               />
               <button
@@ -858,7 +877,7 @@ export function PosRegisterPage({
                   setCheckoutError(null);
                 }}
                 data-testid="exact-tender-btn"
-                className="px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 disabled:opacity-40 text-amber-300 text-xs font-bold shrink-0 cursor-pointer transition-colors"
+                className="px-3 py-1.5 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-xs font-semibold shrink-0 cursor-pointer transition-colors"
               >
                 Exact
               </button>
@@ -866,9 +885,9 @@ export function PosRegisterPage({
             {(isTenderInsufficient || checkoutError) && (
               <p
                 data-testid="pos-checkout-error"
-                className="mt-1.5 text-[11px] text-rose-400 flex items-center gap-1"
+                className="mt-1.5 text-[11px] text-red-700 dark:text-rose-400 flex items-center gap-1"
               >
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
                 <span>
                   {isTenderInsufficient
                     ? `Insufficient amount: short by ${formatCurrency(shortfallAmount, currencySymbol)}`
@@ -879,24 +898,24 @@ export function PosRegisterPage({
           </div>
 
           {/* Price Breakdown Box */}
-          <div className="p-3.5 rounded-xl bg-stone-950/90 border border-stone-800/80 space-y-1.5 text-xs font-mono">
-            <div className="flex justify-between text-stone-400">
+          <div className="p-3.5 rounded-md bg-zinc-50 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-800 space-y-1.5 text-xs font-mono tabular-nums">
+            <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
               <span>Subtotal</span>
               <span>{formatCurrency(subtotal, currencySymbol)}</span>
             </div>
             {discountAmount > 0 && (
-              <div className="flex justify-between text-amber-400 font-semibold">
+              <div className="flex justify-between text-amber-800 dark:text-amber-400 font-semibold">
                 <span>Discount</span>
                 <span>-{formatCurrency(discountAmount, currencySymbol)}</span>
               </div>
             )}
-            <div className="flex justify-between text-stone-400">
+            <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
               <span>12% VAT ({taxInclusive ? 'Included' : 'Added'})</span>
               <span>{formatCurrency(taxAmount, currencySymbol)}</span>
             </div>
-            <div className="flex justify-between text-base font-extrabold text-white pt-2 border-t border-stone-800">
+            <div className="flex justify-between text-base font-bold text-zinc-950 dark:text-zinc-50 pt-2 border-t border-zinc-200 dark:border-zinc-800">
               <span>Total Due</span>
-              <span data-testid="pos-total-due" className="text-amber-400 text-lg">
+              <span data-testid="pos-total-due" className="text-amber-800 dark:text-amber-400 text-lg tabular-nums">
                 {formatCurrency(totalAmount, currencySymbol)}
               </span>
             </div>
@@ -906,9 +925,9 @@ export function PosRegisterPage({
             type="submit"
             disabled={!canCompleteSale}
             data-testid="complete-sale-btn"
-            className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-stone-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-amber-950/40 cursor-pointer transition-all active:scale-[0.99]"
+            className="w-full py-3 px-4 rounded-md bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-950 font-bold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
           >
-            <CheckCircle2 className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />
             <span>Complete Checkout & Issue Official Receipt</span>
           </button>
         </form>

@@ -25,42 +25,50 @@ export function ReloadPrompt() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full mx-auto p-4 rounded-xl glass-panel shadow-2xl border border-slate-700/80 animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] mx-auto p-4 rounded-lg bg-white dark:bg-carbon shadow-lg border border-zinc-200 dark:border-zinc-800">
       <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 mt-0.5">
-          {needRefresh ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+        <div className="p-2 rounded-md bg-zinc-100 dark:bg-carbon-elevated text-zinc-900 dark:text-zinc-100 shrink-0">
+          {needRefresh ? (
+            <RefreshCw className="w-4 h-4 animate-spin" strokeWidth={1.75} />
+          ) : (
+            <Download className="w-4 h-4 text-emerald-700 dark:text-emerald-400" strokeWidth={1.75} />
+          )}
         </div>
-        <div className="flex-1">
-          <h4 className="text-sm font-semibold text-white">
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
             {needRefresh ? 'Update Available' : 'Offline Mode Ready'}
           </h4>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5 leading-relaxed">
             {needRefresh
-              ? 'A new version of Countwise is ready. Reload to apply updates.'
-              : 'Countwise has been cached and will function fully without internet.'}
+              ? 'A new version of MegaHertz Depot is ready. Reload to apply updates.'
+              : 'MegaHertz Depot is cached and ready to work offline.'}
           </p>
           <div className="mt-3 flex items-center gap-2">
             {needRefresh && (
               <button
+                type="button"
                 onClick={() => updateServiceWorker(true)}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium cursor-pointer transition-colors shadow-sm"
+                className="px-3 py-1.5 bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950 rounded-md text-xs font-medium cursor-pointer transition-colors"
               >
                 Reload Now
               </button>
             )}
             <button
+              type="button"
               onClick={close}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+              className="px-3 py-1.5 bg-white dark:bg-carbon hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-md text-xs font-medium cursor-pointer transition-colors"
             >
               Dismiss
             </button>
           </div>
         </div>
         <button
+          type="button"
           onClick={close}
-          className="text-slate-500 hover:text-slate-300 p-1 rounded-md transition-colors cursor-pointer"
+          aria-label="Dismiss notification"
+          className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white p-1 rounded transition-colors cursor-pointer"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4" strokeWidth={1.75} />
         </button>
       </div>
     </div>

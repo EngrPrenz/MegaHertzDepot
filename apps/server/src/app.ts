@@ -24,6 +24,10 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+  );
   if (config.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
@@ -32,7 +36,9 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 
 app.use(
   cors({
-    origin: config.CLIENT_URL.split(','),
+    origin: config.CLIENT_URL.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
     credentials: true,
   })
 );

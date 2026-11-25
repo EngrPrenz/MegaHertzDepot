@@ -716,4 +716,195 @@ describe('API Server & Sync Protocol Integration Tests', () => {
     expect(catalogRes.body.products).toHaveLength(1);
     expect(catalogRes.body.products[0].imageUrl).toBe('/images/products/CPU-AMD-5600.webp');
   });
+
+  it('should enforce STAFF_INVITE_CODE on staff registration without blocking customer signup', async () => {
+    const prev = process.env.STAFF_INVITE_CODE;
+    process.env.STAFF_INVITE_CODE = 'super-secret-staff-code-99';
+    try {
+      const missingRes = await request(app).post('/auth/register').send({
+        email: 'uninvited@countwise.dev',
+        password: 'password123',
+        name: 'Uninvited',
+      });
+      expect(missingRes.status).toBe(403);
+
+      const wrongRes = await request(app).post('/auth/register').send({
+        email: 'wrongcode@countwise.dev',
+        password: 'password123',
+        name: 'Wrong Code',
+        inviteCode: 'wrong-code',
+      });
+      expect(wrongRes.status).toBe(403);
+
+      const custRes = await request(app).post('/auth/customer/register').send({
+        email: 'customer-open@countwise.dev',
+        password: 'password123',
+        name: 'Customer Open',
+      });
+      expect(custRes.status).toBe(201);
+
+      const okRes = await request(app).post('/auth/register').send({
+        email: 'invited-staff@countwise.dev',
+        password: 'password123',
+        name: 'Invited Staff',
+        inviteCode: 'super-secret-staff-code-99',
+      });
+      expect(okRes.status).toBe(201);
+      expect(okRes.body).toHaveProperty('accessToken');
+    } finally {
+      if (prev === undefined) {
+        delete process.env.STAFF_INVITE_CODE;
+      } else {
+        process.env.STAFF_INVITE_CODE = prev;
+      }
+    }
+  });
+
+  it('should reject out-of-stock or aggregate excess quantities on POST /public/orders with 409', async () => {
+    const reg = await request(app).post('/auth/register').send({
+      email: 'stock-guard@countwise.dev',
+      password: 'password123',
+      name: 'Stock Guard Depot',
+    });
+    const token = reg.body.accessToken as string;
+    const storeId = reg.body.defaultStoreId as string;
+    const productId = crypto.randomUUID();
+
+    await request(app)
+      .post('/sync/push')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        deviceId: 'admin-1',
+        mutations: [
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'product.create',
+            hlc: '001700000001000:000000:admin-1',
+            createdAt: 1700000001000,
+            payload: {
+              id: productId,
+              storeId,
+              name: 'RTX 5070 Limited Stock',
+              category: 'GPU',
+              price: 39500,
+              nameHlc: '001700000001000:000000:admin-1',
+              priceHlc: '001700000001000:000000:admin-1',
+            },
+          },
+          {
+            mutationId: crypto.randomUUID(),
+            storeId,
+            type: 'adjustment.create',
+            hlc: '001700000001001:000000:admin-1',
+            createdAt: 1700000001001,
+            payload: {
+              id: crypto.randomUUID(),
+              productId,
+              storeId,
+              delta: 2,
+              reason: 'restock',
+              createdAt: 1700000001001,
+              hlc: '001700000001001:000000:admin-1',
+              deviceId: 'admin-1',
+            },
+          },
+        ],
+      });
+
+    // Excess aggregate quantity split across two line items must fail with 409
+    const splitExceedRes = await request(app).post('/public/orders').send({
+      storeId,
+      customerName: 'Greedy Buyer',
+      fulfillment: 'pickup',
+      paymentMethod: 'Cash',
+      items: [
+        { productId, quantity: 2 },
+        { productId, quantity: 1 },
+      ],
+    });
+    expect(splitExceedRes.status).toBe(409);
+
+    // Valid order for available qty (2) succeeds, subsequent order fails with 409
+    const okRes = await request(app).post('/public/orders').send({
+      storeId,
+      customerName: 'Valid Buyer',
+      fulfillment: 'pickup',
+      paymentMethod: 'Cash',
+      items: [{ productId, quantity: 2 }],
+    });
+    expect(okRes.status).toBe(201);
+
+    const depleteRes = await request(app).post('/public/orders').send({
+      storeId,
+      customerName: 'Late Buyer',
+      fulfillment: 'pickup',
+      paymentMethod: 'Cash',
+      items: [{ productId, quantity: 1 }],
+    });
+    expect(depleteRes.status).toBe(409);
+  });
+
+  it('should reject non-UUID storeId on POST /stores/:storeId/members and include CSP header', async () => {
+    const healthRes = await request(app).get('/health');
+    expect(healthRes.status).toBe(200);
+    expect(healthRes.headers['content-security-policy']).toContain("script-src 'self'");
+    expect(healthRes.headers['content-security-policy']).toContain("object-src 'none'");
+
+    const reg = await request(app).post('/auth/register').send({
+      email: 'param-check@countwise.dev',
+      password: 'password123',
+      name: 'Param Store',
+    });
+
+    const badParamRes = await request(app)
+      .post('/stores/not-a-uuid/members')
+      .set('Authorization', `Bearer ${reg.body.accessToken}`)
+      .send({ email: 'friend@countwise.dev' });
+
+    expect(badParamRes.status).toBe(400);
+    expect(badParamRes.body.error).toBe('Invalid storeId parameter');
+  });
+
+  it('should reject unsafe imageUrl schemes during /sync/push', async () => {
+    const reg = await request(app).post('/auth/register').send({
+      email: 'imgscheme@countwise.dev',
+      password: 'password123',
+      name: 'Image Scheme Depot',
+    });
+    const token = reg.body.accessToken as string;
+    const storeId = reg.body.defaultStoreId as string;
+
+    for (const unsafeUrl of [
+      'javascript:alert(1)',
+      'data:image/svg+xml,<svg onload=alert(1)>',
+      '//evil.example/payload.webp',
+    ]) {
+      const res = await request(app)
+        .post('/sync/push')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          deviceId: 'dev-sec',
+          mutations: [
+            {
+              mutationId: crypto.randomUUID(),
+              storeId,
+              type: 'product.create',
+              hlc: '001700000001000:000000:dev-sec',
+              createdAt: 1700000001000,
+              payload: {
+                id: crypto.randomUUID(),
+                storeId,
+                name: 'Unsafe Image Item',
+                imageUrl: unsafeUrl,
+                nameHlc: '001700000001000:000000:dev-sec',
+              },
+            },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.results[0].status).toBe('rejected');
+    }
+  });
 });

@@ -94,15 +94,15 @@ export function ModalDialog({
       ref={dialogRef}
       closedby="any"
       aria-labelledby={titleId}
-      className={`m-auto w-full ${maxWidthClass} rounded-2xl bg-stone-900 border border-stone-800 text-stone-100 p-0 shadow-2xl open:animate-in open:fade-in open:zoom-in-95 duration-150`}
+      className={`m-auto w-[calc(100%-2rem)] ${maxWidthClass} rounded-lg bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 text-zinc-950 dark:text-zinc-50 p-0 shadow-xl`}
     >
       <div className="p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start justify-between gap-3 pb-3.5 mb-4 border-b border-zinc-200 dark:border-zinc-800">
           <div>
-            <h3 id={titleId} className="text-base font-bold text-white">
+            <h3 id={titleId} className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
               {title}
             </h3>
-            {subtitle && <p className="text-xs text-stone-400 mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{subtitle}</p>}
           </div>
           <button
             type="button"
@@ -111,9 +111,9 @@ export function ModalDialog({
               onClose();
             }}
             aria-label="Close modal"
-            className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
         {children}

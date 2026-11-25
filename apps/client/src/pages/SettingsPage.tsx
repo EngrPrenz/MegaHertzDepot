@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { localDb } from '../db/index.js';
 import { localRepository } from '../services/localRepository.js';
+import { useColorScheme, ColorSchemePreference } from '../hooks/useColorScheme.js';
 import {
   Store,
   Smartphone,
@@ -14,7 +15,10 @@ import {
   Download,
   Upload,
   Database,
-  Sparkles,
+  PackagePlus,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 
 interface StoreOption {
@@ -54,6 +58,9 @@ export function SettingsPage({
   const [inviteEmail, setInviteEmail] = useState('');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+
+  const { preference: themePreference, systemScheme, setPreference: setThemePreference } =
+    useColorScheme();
 
   useEffect(() => {
     localRepository.getDeviceId().then(setDeviceId);
@@ -154,6 +161,11 @@ export function SettingsPage({
   const handleImportSnapshot = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 15 * 1024 * 1024) {
+      showTempStatus('Snapshot file exceeds 15MB size limit.');
+      e.target.value = '';
+      return;
+    }
     setSnapshotBusy(true);
     try {
       const text = await file.text();
@@ -162,6 +174,19 @@ export function SettingsPage({
       if (!data || !Array.isArray(data.products)) {
         throw new Error('Invalid snapshot file format.');
       }
+
+      const SAFE_DATA_IMAGE_RE = /^data:image\/(webp|png|jpeg|gif);base64,/i;
+      const isSafeSnapshotUrl = (url: unknown): url is string => {
+        if (typeof url !== 'string') return false;
+        const trimmed = url.trim();
+        if (!trimmed || trimmed.startsWith('//') || trimmed.length > 2000) return false;
+        return (
+          trimmed.startsWith('/') ||
+          trimmed.startsWith('https://') ||
+          trimmed.startsWith('http://') ||
+          trimmed.startsWith('local-img://')
+        );
+      };
 
       let restoredImages = 0;
       let restoredProducts = 0;
@@ -179,9 +204,23 @@ export function SettingsPage({
                 typeof img.id === 'string' &&
                 img.id.trim() &&
                 typeof img.dataUrl === 'string' &&
-                img.dataUrl.startsWith('data:image/')
+                SAFE_DATA_IMAGE_RE.test(img.dataUrl.trim())
               ) {
-                await localDb.productImages.put(img);
+                await localDb.productImages.put({
+                  id: img.id.trim(),
+                  dataUrl: img.dataUrl.trim(),
+                  mimeType:
+                    typeof img.mimeType === 'string' ? img.mimeType : 'image/webp',
+                  size:
+                    typeof img.size === 'number' && Number.isFinite(img.size)
+                      ? img.size
+                      : img.dataUrl.length,
+                  fileName: typeof img.fileName === 'string' ? img.fileName : undefined,
+                  createdAt:
+                    typeof img.createdAt === 'number' && Number.isFinite(img.createdAt)
+                      ? img.createdAt
+                      : Date.now(),
+                });
                 restoredImages++;
               }
             }
@@ -196,8 +235,40 @@ export function SettingsPage({
                 prod.name.trim()
               ) {
                 await localDb.products.put({
-                  ...prod,
+                  id: prod.id.trim(),
                   storeId: currentStoreId,
+                  name: prod.name.trim().slice(0, 255),
+                  sku: typeof prod.sku === 'string' ? prod.sku.slice(0, 100) : undefined,
+                  category: typeof prod.category === 'string' ? prod.category : 'Peripheral',
+                  brand: typeof prod.brand === 'string' ? prod.brand.slice(0, 100) : undefined,
+                  price: typeof prod.price === 'number' && Number.isFinite(prod.price) ? prod.price : 0,
+                  costPrice:
+                    typeof prod.costPrice === 'number' && Number.isFinite(prod.costPrice)
+                      ? prod.costPrice
+                      : undefined,
+                  warranty: typeof prod.warranty === 'string' ? prod.warranty.slice(0, 120) : undefined,
+                  specs: prod.specs && typeof prod.specs === 'object' ? prod.specs : undefined,
+                  imageUrl: isSafeSnapshotUrl(prod.imageUrl) ? prod.imageUrl.trim() : undefined,
+                  publicStock:
+                    typeof prod.publicStock === 'number' && Number.isFinite(prod.publicStock)
+                      ? prod.publicStock
+                      : undefined,
+                  nameHlc:
+                    typeof prod.nameHlc === 'string' && prod.nameHlc.trim()
+                      ? prod.nameHlc
+                      : '000000000000000:000000:snapshot',
+                  skuHlc: typeof prod.skuHlc === 'string' ? prod.skuHlc : undefined,
+                  priceHlc: typeof prod.priceHlc === 'string' ? prod.priceHlc : undefined,
+                  imageHlc: typeof prod.imageHlc === 'string' ? prod.imageHlc : undefined,
+                  deletedAt:
+                    typeof prod.deletedAt === 'number' && Number.isFinite(prod.deletedAt)
+                      ? prod.deletedAt
+                      : undefined,
+                  deletedHlc: typeof prod.deletedHlc === 'string' ? prod.deletedHlc : undefined,
+                  serverSeq:
+                    typeof prod.serverSeq === 'number' && Number.isFinite(prod.serverSeq)
+                      ? prod.serverSeq
+                      : undefined,
                 });
                 restoredProducts++;
               }
@@ -215,8 +286,31 @@ export function SettingsPage({
                 Number.isFinite(adj.delta)
               ) {
                 await localDb.adjustments.put({
-                  ...adj,
+                  id: adj.id.trim(),
+                  productId: adj.productId.trim(),
                   storeId: currentStoreId,
+                  delta: Math.trunc(adj.delta),
+                  reason:
+                    adj.reason === 'count' ||
+                    adj.reason === 'sale' ||
+                    adj.reason === 'restock' ||
+                    adj.reason === 'damage'
+                      ? adj.reason
+                      : 'other',
+                  countedPhysical:
+                    typeof adj.countedPhysical === 'number' ? adj.countedPhysical : undefined,
+                  localStockAtCount:
+                    typeof adj.localStockAtCount === 'number' ? adj.localStockAtCount : undefined,
+                  createdAt:
+                    typeof adj.createdAt === 'number' && Number.isFinite(adj.createdAt)
+                      ? adj.createdAt
+                      : Date.now(),
+                  hlc:
+                    typeof adj.hlc === 'string' && adj.hlc.trim()
+                      ? adj.hlc
+                      : '000000000000000:000000:snapshot',
+                  deviceId: typeof adj.deviceId === 'string' ? adj.deviceId : 'snapshot',
+                  userId: typeof adj.userId === 'string' ? adj.userId : user.id,
                 });
                 restoredAdjustments++;
               }
@@ -231,8 +325,47 @@ export function SettingsPage({
                 Array.isArray(ord.items)
               ) {
                 await localDb.orders.put({
-                  ...ord,
+                  id: ord.id.trim(),
                   storeId: currentStoreId,
+                  receiptNumber:
+                    typeof ord.receiptNumber === 'string' ? ord.receiptNumber : 'MHD-SNAPSHOT',
+                  customerName:
+                    typeof ord.customerName === 'string' ? ord.customerName : undefined,
+                  customerPhone:
+                    typeof ord.customerPhone === 'string' ? ord.customerPhone : undefined,
+                  items: ord.items,
+                  subtotal: typeof ord.subtotal === 'number' ? ord.subtotal : 0,
+                  discountAmount: typeof ord.discountAmount === 'number' ? ord.discountAmount : 0,
+                  taxRate: typeof ord.taxRate === 'number' ? ord.taxRate : 12,
+                  taxInclusive: typeof ord.taxInclusive === 'boolean' ? ord.taxInclusive : true,
+                  taxAmount: typeof ord.taxAmount === 'number' ? ord.taxAmount : 0,
+                  totalAmount: typeof ord.totalAmount === 'number' ? ord.totalAmount : 0,
+                  paymentMethod:
+                    ord.paymentMethod === 'Cash' ||
+                    ord.paymentMethod === 'GCash' ||
+                    ord.paymentMethod === 'Maya' ||
+                    ord.paymentMethod === 'Card' ||
+                    ord.paymentMethod === 'Split'
+                      ? ord.paymentMethod
+                      : 'Cash',
+                  amountTendered:
+                    typeof ord.amountTendered === 'number' ? ord.amountTendered : 0,
+                  changeDue: typeof ord.changeDue === 'number' ? ord.changeDue : 0,
+                  notes: typeof ord.notes === 'string' ? ord.notes : undefined,
+                  createdAt:
+                    typeof ord.createdAt === 'number' && Number.isFinite(ord.createdAt)
+                      ? ord.createdAt
+                      : Date.now(),
+                  hlc:
+                    typeof ord.hlc === 'string' && ord.hlc.trim()
+                      ? ord.hlc
+                      : '000000000000000:000000:snapshot',
+                  deviceId: typeof ord.deviceId === 'string' ? ord.deviceId : 'snapshot',
+                  userId: typeof ord.userId === 'string' ? ord.userId : user.id,
+                  serverSeq:
+                    typeof ord.serverSeq === 'number' && Number.isFinite(ord.serverSeq)
+                      ? ord.serverSeq
+                      : undefined,
                 });
                 restoredOrders++;
               }
@@ -266,33 +399,69 @@ export function SettingsPage({
     }
   };
 
+  const themeOptions: Array<{
+    value: ColorSchemePreference;
+    label: string;
+    detail: string;
+    icon: typeof Monitor;
+    testId: string;
+  }> = [
+    {
+      value: 'system',
+      label: `System (Currently ${systemScheme === 'dark' ? 'Dark' : 'Light'})`,
+      detail: 'Follow your device color scheme automatically',
+      icon: Monitor,
+      testId: 'theme-pref-system',
+    },
+    {
+      value: 'light',
+      label: 'Light',
+      detail: 'Precision retail zinc & warm paper surfaces',
+      icon: Sun,
+      testId: 'theme-pref-light',
+    },
+    {
+      value: 'dark',
+      label: 'Dark',
+      detail: 'Carbon precision zinc (#09090b) & CAD night mode',
+      icon: Moon,
+      testId: 'theme-pref-dark',
+    },
+  ];
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-5">
       {statusMsg && (
-        <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800 text-amber-200 text-xs font-medium">
+        <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-medium">
           {statusMsg}
         </div>
       )}
 
       {/* Store Picker & Multi-Store Management */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <Store className="w-5 h-5 text-amber-400" />
-          <span>MegaHertz Depot Branch & Team Membership</span>
-        </h3>
+      <section className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg divide-y divide-zinc-200 dark:divide-zinc-800">
+        <div className="px-5 py-4 flex items-center gap-2">
+          <Store className="w-4 h-4 text-zinc-700 dark:text-zinc-300" strokeWidth={1.75} />
+          <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+            Branch Selection & Team Access
+          </h3>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           <div className="min-w-0">
-            <label className="block text-xs font-medium text-stone-300 mb-1.5">
-              Selected Store Branch
+            <label
+              htmlFor="settings-active-branch"
+              className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5"
+            >
+              Active Store Branch
             </label>
             <select
+              id="settings-active-branch"
               value={currentStoreId}
               onChange={(e) => onSelectStore(e.target.value)}
-              className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+              className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
             >
               {stores.map((s) => (
-                <option key={s.id} value={s.id}>
+                <option key={s.id} value={s.id} className="bg-white dark:bg-carbon">
                   {s.name} ({s.id.slice(0, 8)})
                 </option>
               ))}
@@ -300,81 +469,141 @@ export function SettingsPage({
           </div>
 
           <form onSubmit={handleCreateNewStore} className="min-w-0">
-            <label className="block text-xs font-medium text-stone-300 mb-1.5">
-              Create Additional Store Branch
+            <label
+              htmlFor="settings-new-branch"
+              className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5"
+            >
+              Create Additional Branch
             </label>
             <div className="flex items-center gap-2 min-w-0">
               <input
+                id="settings-new-branch"
                 type="text"
                 value={newStoreName}
                 onChange={(e) => setNewStoreName(e.target.value)}
                 placeholder="e.g. Gilmore Flagship / Mall Kiosk"
-                className="min-w-0 flex-1 bg-stone-900 border border-stone-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                className="min-w-0 flex-1 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
               />
               <button
                 type="submit"
-                className="shrink-0 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold inline-flex items-center gap-1 cursor-pointer shadow-md shadow-amber-950/40"
+                className="shrink-0 px-3.5 py-2 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4" strokeWidth={1.75} />
                 <span>Create</span>
               </button>
             </div>
           </form>
         </div>
 
-        {/* Invite Staff Member to Store */}
-        <form onSubmit={handleInviteStaff} className="pt-2 border-t border-stone-800 min-w-0">
-          <label className="block text-xs font-medium text-stone-300 mb-1.5 flex items-center gap-1.5">
-            <UserPlus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Add Cashier / Technician to Active Branch (by registered email)</span>
+        <form onSubmit={handleInviteStaff} className="p-5 min-w-0">
+          <label
+            htmlFor="settings-invite-email"
+            className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center gap-1.5"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 shrink-0" strokeWidth={1.75} />
+            <span>Add Cashier or Technician to Active Branch (by registered email)</span>
           </label>
           <div className="flex items-center gap-2 min-w-0">
             <input
+              id="settings-invite-email"
               type="email"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="cashier2@megahertzdepot.com"
-              className="min-w-0 flex-1 bg-stone-900 border border-stone-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+              className="min-w-0 flex-1 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
             />
             <button
               type="submit"
-              className="shrink-0 px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-white text-xs font-semibold cursor-pointer"
+              className="shrink-0 px-4 py-2 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-xs font-semibold cursor-pointer transition-colors"
             >
               Add Member
             </button>
           </div>
         </form>
-      </div>
+      </section>
 
-      {/* Device Identity, Currency & Low-Stock Threshold */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <Smartphone className="w-5 h-5 text-blue-400" />
-            <span>POS Terminal Node & Store Preferences</span>
-          </h3>
+      {/* Appearance & Color Scheme Selector (3 explicit states) */}
+      <section className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg divide-y divide-zinc-200 dark:divide-zinc-800">
+        <div className="px-5 py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sun className="w-4 h-4 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
+            <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+              Appearance & Color Theme
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+            Active: {themePreference}
+          </span>
+        </div>
+
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {themeOptions.map((opt) => {
+            const Icon = opt.icon;
+            const active = themePreference === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                data-testid={opt.testId}
+                aria-pressed={active}
+                onClick={() => setThemePreference(opt.value)}
+                className={`p-3 rounded-md border text-left transition-colors cursor-pointer space-y-1 ${
+                  active
+                    ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-600 dark:border-amber-500 text-zinc-950 dark:text-zinc-50'
+                    : 'bg-zinc-50 dark:bg-carbon-elevated border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-600'
+                }`}
+              >
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  <Icon
+                    className={`w-4 h-4 ${active ? 'text-amber-700 dark:text-amber-400' : 'text-zinc-500 dark:text-zinc-400'}`}
+                    strokeWidth={1.75}
+                  />
+                  <span>{opt.label}</span>
+                </div>
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                  {opt.detail}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Terminal Identity, Currency & Threshold */}
+      <section className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg divide-y divide-zinc-200 dark:divide-zinc-800">
+        <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-zinc-700 dark:text-zinc-300" strokeWidth={1.75} />
+            <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
+              POS Terminal & Store Preferences
+            </h3>
+          </div>
           {deviceId && (
-            <span className="text-[11px] text-stone-400 font-mono bg-stone-900 border border-stone-800 px-2.5 py-1 rounded-lg">
-              HLC Node: <code className="text-amber-400 font-semibold">{deviceId}</code>
+            <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-mono bg-zinc-100 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 rounded">
+              Node: <code className="text-zinc-950 dark:text-zinc-50 font-semibold">{deviceId}</code>
             </span>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <form onSubmit={handleSaveDeviceName} className="space-y-1.5 min-w-0">
-            <label className="block text-xs font-medium text-stone-300 truncate">
+            <label
+              htmlFor="settings-terminal-label"
+              className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 truncate"
+            >
               Terminal Label
             </label>
             <div className="flex items-center gap-2 min-w-0">
               <input
+                id="settings-terminal-label"
                 type="text"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
-                className="min-w-0 flex-1 bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                className="min-w-0 flex-1 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
               />
               <button
                 type="submit"
-                className="shrink-0 px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 border border-stone-700 text-white text-xs font-semibold cursor-pointer transition"
+                className="shrink-0 px-3.5 py-2 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-xs font-semibold cursor-pointer transition-colors"
               >
                 Save
               </button>
@@ -382,67 +611,74 @@ export function SettingsPage({
           </form>
 
           <div className="space-y-1.5 min-w-0">
-            <label className="block text-xs font-medium text-stone-300 flex items-center gap-1.5 truncate">
-              <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <label
+              htmlFor="settings-currency"
+              className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 truncate"
+            >
+              <Coins className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 shrink-0" strokeWidth={1.75} />
               <span className="truncate">Store Currency Symbol</span>
             </label>
             <select
+              id="settings-currency"
               value={currencySymbol}
               onChange={(e) => onChangeCurrencySymbol(e.target.value)}
-              className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+              className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
             >
-              <option value="₱">₱ — Philippine Peso (PHP)</option>
-              <option value="$">$ — US Dollar (USD)</option>
-              <option value="€">€ — Euro (EUR)</option>
-              <option value="£">£ — British Pound (GBP)</option>
-              <option value="¥">¥ — Japanese Yen (JPY)</option>
+              <option value="₱">₱ (PHP - Philippine Peso)</option>
+              <option value="$">$ (USD - US Dollar)</option>
+              <option value="€">€ (EUR - Euro)</option>
+              <option value="£">£ (GBP - British Pound)</option>
+              <option value="¥">¥ (JPY - Japanese Yen)</option>
             </select>
           </div>
 
           <div className="space-y-1.5 min-w-0">
-            <label className="block text-xs font-medium text-stone-300 flex items-center gap-1.5 truncate">
-              <Bell className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <label
+              htmlFor="settings-low-stock"
+              className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5 truncate"
+            >
+              <Bell className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 shrink-0" strokeWidth={1.75} />
               <span className="truncate">Low-Stock Alert Threshold</span>
             </label>
             <input
+              id="settings-low-stock"
               type="number"
               min={0}
               value={lowStockThreshold}
               onChange={(e) => onChangeLowStockThreshold(parseInt(e.target.value, 10) || 0)}
-              className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+              className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3 py-2 text-sm text-zinc-950 dark:text-zinc-50 tabular-nums focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 1-Click Local Demo Snapshot Backup & Restore */}
-      <div className="glass-panel p-6 rounded-2xl space-y-4">
-        <div>
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <Database className="w-5 h-5 text-amber-400" />
-            <span>Local Demo Snapshot Backup &amp; Restore</span>
+      {/* Local Backup & Restore */}
+      <section className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg divide-y divide-zinc-200 dark:divide-zinc-800">
+        <div className="px-5 py-4">
+          <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50 flex items-center gap-2">
+            <Database className="w-4 h-4 text-zinc-700 dark:text-zinc-300" strokeWidth={1.75} />
+            <span>Local Backup, Restore & Sample Catalog</span>
           </h3>
-          <p className="text-xs text-stone-400 mt-1">
-            Export your entire branch database (including custom locally stored WebP product photos,
-            stock adjustments, and POS receipts) to a portable JSON file, or restore a snapshot
-            instantly on any device with zero cloud bucket usage.
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+            Export your branch database (custom product photos, stock adjustments, and POS
+            receipts) to a portable JSON file, or restore a saved backup on any terminal.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="p-5 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             disabled={snapshotBusy}
             onClick={handleExportSnapshot}
             data-testid="export-demo-snapshot-btn"
-            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-amber-950/40 cursor-pointer transition"
+            className="px-4 py-2 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white disabled:opacity-50 text-white dark:text-zinc-950 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors"
           >
-            <Download className="w-4 h-4" />
-            <span>Export Demo Snapshot (.json)</span>
+            <Download className="w-4 h-4" strokeWidth={1.75} />
+            <span>Export Snapshot (.json)</span>
           </button>
 
-          <label className="px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700 text-stone-200 hover:text-white text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition">
-            <Upload className="w-4 h-4 text-amber-400" />
+          <label className="px-4 py-2 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer transition-colors">
+            <Upload className="w-4 h-4 text-zinc-700 dark:text-zinc-300" strokeWidth={1.75} />
             <span>Restore Snapshot (.json)</span>
             <input
               type="file"
@@ -457,46 +693,46 @@ export function SettingsPage({
             type="button"
             disabled={snapshotBusy}
             onClick={handleReseedCatalog}
-            className="px-3.5 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-amber-300 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition"
+            className="px-3.5 py-2 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <PackagePlus className="w-4 h-4 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
             <span>Reseed Missing Sample Hardware</span>
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* Storage Persistence & Security Notes (Sections 9, 10, 13) */}
-      <div className="glass-panel p-6 rounded-2xl space-y-3 text-xs">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+      {/* Storage Persistence & Security Notes */}
+      <section className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 space-y-3 text-xs">
+        <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50 flex items-center gap-2">
           {isStoragePersisted ? (
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" strokeWidth={1.75} />
           ) : (
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <ShieldAlert className="w-4 h-4 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
           )}
           <span>Browser Storage & Offline Security Model</span>
         </h3>
 
-        <div className="space-y-2 text-slate-300 leading-relaxed">
+        <div className="space-y-2 text-zinc-700 dark:text-zinc-300 leading-relaxed">
           <p>
-            <strong>Account:</strong> {user.email}
+            <strong className="text-zinc-950 dark:text-zinc-50">Account:</strong> {user.email}
           </p>
           <p>
-            <strong>Persistent Storage Status:</strong>{' '}
+            <strong className="text-zinc-950 dark:text-zinc-50">Persistent Storage Status:</strong>{' '}
             {isStoragePersisted
-              ? 'Granted (navigator.storage.persist() active — protected from automatic storage eviction).'
+              ? 'Granted (navigator.storage.persist() active, protected from automatic eviction).'
               : 'Best-effort storage (Browser did not grant explicit persistent lock; sync regularly on iOS/Safari).'}
           </p>
-          <p className="flex items-start gap-2 text-slate-400 bg-slate-900/80 p-3 rounded-xl border border-slate-800">
-            <Lock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+          <p className="flex items-start gap-2 text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-carbon-elevated p-3 rounded-md border border-zinc-200 dark:border-zinc-800">
+            <Lock className="w-4 h-4 text-zinc-500 dark:text-zinc-400 shrink-0 mt-0.5" strokeWidth={1.75} />
             <span>
-              <strong>Security Tradeoff Note:</strong> Local POS receipts and hardware inventory
-              records in IndexedDB are stored unencrypted so the register can query, ring up sales,
-              and aggregate deltas instantaneously while offline. Avoid using shared public kiosks
-              without clearing browser site data after syncing.
+              <strong className="text-zinc-900 dark:text-zinc-100">Security Tradeoff:</strong> Local POS receipts and
+              hardware inventory records in IndexedDB are stored unencrypted so the register can
+              query, ring up sales, and aggregate deltas instantaneously while offline. Avoid shared
+              public terminals without clearing site data after syncing.
             </span>
           </p>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

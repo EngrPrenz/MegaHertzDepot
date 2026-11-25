@@ -20,6 +20,7 @@ const configSchema = z
     JWT_REFRESH_SECRET: z.string().default(DEFAULT_DEV_REFRESH),
     JWT_EXPIRES_IN: z.string().default('15m'),
     JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
+    STAFF_INVITE_CODE: z.string().optional(),
   })
   .superRefine((val, ctx) => {
     if (val.NODE_ENV === 'production') {
@@ -35,6 +36,13 @@ const configSchema = z
           code: z.ZodIssueCode.custom,
           path: ['JWT_REFRESH_SECRET'],
           message: 'JWT_REFRESH_SECRET must be set to a strong secret in production',
+        });
+      }
+      if (!val.STAFF_INVITE_CODE || val.STAFF_INVITE_CODE.trim().length < 12) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['STAFF_INVITE_CODE'],
+          message: 'STAFF_INVITE_CODE must be set to at least 12 characters in production',
         });
       }
     }

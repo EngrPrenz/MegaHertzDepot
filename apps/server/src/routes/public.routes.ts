@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
 import { Router, Request, Response } from 'express';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { stores, products, adjustments, saleOrders, changeLog } from '../db/schema.js';
 import { isPostgresAvailable, memoryDb, DEMO_STORE_ID, DEMO_USER_ID } from '../db/memory-fallback.js';
+import { config } from '../config.js';
+import { createRateLimiter } from '../middlewares/rateLimit.middleware.js';
 import {
   paymentMethodSchema,
   HybridLogicalClock,
@@ -188,16 +190,28 @@ router.get('/catalog', async (req: Request, res: Response) => {
 
     res.status(200).json({ storeId: resolved.storeId, products: publicProducts });
   } catch (error: any) {
-    res.status(500).json({ error: error?.message || 'Failed to fetch public catalog' });
+    console.error('Public catalog error:', error);
+    res.status(500).json({
+      error:
+        config.NODE_ENV === 'production'
+          ? 'Internal Server Error'
+          : error?.message || 'Failed to fetch public catalog',
+    });
   }
+});
+
+const publicOrderRateLimiter = createRateLimiter({
+  windowMs: 5 * 60_000,
+  max: 5,
+  keyPrefix: 'public-orders',
 });
 
 /**
  * POST /public/orders
- * Authoritative public storefront checkout: computes unit prices, VAT, and delivery fee server-side
- * and appends order + stock deductions to `changeLog` so staff terminals pull them via `/sync/pull`.
+ * Authoritative public storefront checkout: computes unit prices, VAT, and delivery fee server-side,
+ * enforces transactional stock availability, and appends order + stock deductions to `changeLog`.
  */
-router.post('/orders', async (req: Request, res: Response) => {
+router.post('/orders', publicOrderRateLimiter, async (req: Request, res: Response) => {
   const parsed = publicOrderRequestSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -244,18 +258,44 @@ router.post('/orders', async (req: Request, res: Response) => {
       .filter(Boolean)
       .join(' | ');
 
+    const requestedByProductId = new Map<string, number>();
+    for (const reqItem of input.items) {
+      requestedByProductId.set(
+        reqItem.productId,
+        (requestedByProductId.get(reqItem.productId) || 0) + reqItem.quantity
+      );
+    }
+
     const usePg = await isPostgresAvailable();
 
     if (!usePg) {
+      const stockMap = new Map<string, number>();
+      for (const adj of memoryDb.adjustments.values()) {
+        if (adj.storeId === resolved.storeId && requestedByProductId.has(adj.productId)) {
+          stockMap.set(adj.productId, (stockMap.get(adj.productId) || 0) + adj.delta);
+        }
+      }
+
+      for (const [productId, requestedQty] of requestedByProductId.entries()) {
+        const prod = memoryDb.products.get(productId);
+        if (!prod || prod.storeId !== resolved.storeId || prod.deletedAt) {
+          res.status(400).json({ error: `Product not found or unavailable: ${productId}` });
+          return;
+        }
+        const available = stockMap.get(productId) ?? 0;
+        if (available < requestedQty) {
+          res.status(409).json({
+            error: `Insufficient stock for ${prod.name}. Only ${Math.max(0, available)} available.`,
+          });
+          return;
+        }
+      }
+
       const orderItems: SaleOrderItem[] = [];
       let subtotal = 0;
 
       for (const reqItem of input.items) {
-        const prod = memoryDb.products.get(reqItem.productId);
-        if (!prod || prod.storeId !== resolved.storeId || prod.deletedAt) {
-          res.status(400).json({ error: `Product not found or unavailable: ${reqItem.productId}` });
-          return;
-        }
+        const prod = memoryDb.products.get(reqItem.productId)!;
         const unitPrice = Number(prod.price ?? 0);
         subtotal += unitPrice * reqItem.quantity;
         orderItems.push({
@@ -351,22 +391,61 @@ router.post('/orders', async (req: Request, res: Response) => {
     }
 
     const createdOrder = await db.transaction(async (tx) => {
+      const sortedProductIds = Array.from(requestedByProductId.keys()).sort();
+      const lockedProducts = await tx
+        .select()
+        .from(products)
+        .where(
+          and(
+            inArray(products.id, sortedProductIds),
+            eq(products.storeId, resolved.storeId),
+            isNull(products.deletedAt)
+          )
+        )
+        .orderBy(products.id)
+        .for('update');
+
+      const productById = new Map(lockedProducts.map((p) => [p.id, p]));
+      for (const productId of sortedProductIds) {
+        if (!productById.has(productId)) {
+          const err: any = new Error(`Product not found or unavailable: ${productId}`);
+          err.status = 400;
+          throw err;
+        }
+      }
+
+      const relevantAdjustments = await tx
+        .select({ productId: adjustments.productId, delta: adjustments.delta })
+        .from(adjustments)
+        .where(
+          and(
+            eq(adjustments.storeId, resolved.storeId),
+            inArray(adjustments.productId, sortedProductIds)
+          )
+        );
+
+      const stockMap = new Map<string, number>();
+      for (const adj of relevantAdjustments) {
+        stockMap.set(adj.productId, (stockMap.get(adj.productId) || 0) + adj.delta);
+      }
+
+      for (const [productId, requestedQty] of requestedByProductId.entries()) {
+        const prodRow = productById.get(productId)!;
+        const available = stockMap.get(productId) ?? 0;
+        if (available < requestedQty) {
+          const err: any = new Error(
+            `Insufficient stock for ${prodRow.name}. Only ${Math.max(0, available)} available.`
+          );
+          err.status = 409;
+          throw err;
+        }
+      }
+
       const orderItems: SaleOrderItem[] = [];
       let subtotal = 0;
 
       for (const reqItem of input.items) {
-        const prodRow = await tx.query.products.findFirst({
-          where: and(
-            eq(products.id, reqItem.productId),
-            eq(products.storeId, resolved.storeId),
-            isNull(products.deletedAt)
-          ),
-        });
-        if (!prodRow) {
-          const err: any = new Error(`Product not found or unavailable: ${reqItem.productId}`);
-          err.status = 400;
-          throw err;
-        }
+        const prodRow = productById.get(reqItem.productId)!;
         const unitPrice = Number(prodRow.price ?? 0);
         subtotal += unitPrice * reqItem.quantity;
         orderItems.push({
@@ -495,7 +574,15 @@ router.post('/orders', async (req: Request, res: Response) => {
     res.status(201).json({ order: createdOrder });
   } catch (error: any) {
     const status = error?.status || 500;
-    res.status(status).json({ error: error?.message || 'Failed to place storefront order' });
+    if (status >= 500) {
+      console.error('Public order error:', error);
+    }
+    res.status(status).json({
+      error:
+        config.NODE_ENV === 'production' && status >= 500
+          ? 'Internal Server Error'
+          : error?.message || 'Failed to place storefront order',
+    });
   }
 });
 

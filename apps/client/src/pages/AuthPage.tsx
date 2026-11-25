@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useOnlineStatus } from '../hooks/useOnlineStatus.js';
-import { Lock, Mail, User, AlertCircle, ArrowRight, WifiOff } from 'lucide-react';
+import { Lock, Mail, User, AlertCircle, ArrowLeft, ArrowRight, WifiOff } from 'lucide-react';
 import { MegaHertzLogo } from '../components/MegaHertzLogo.js';
+import { ThemeToggleButton } from '../components/ThemeToggleButton.js';
 
 interface AuthPageProps {
   onAuthSuccess: (tokenData: {
@@ -19,6 +20,7 @@ export function AuthPage({ onAuthSuccess, onBackToStorefront }: AuthPageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +37,15 @@ export function AuthPage({ onAuthSuccess, onBackToStorefront }: AuthPageProps) {
 
     try {
       const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
-      const body = mode === 'login' ? { email, password } : { email, password, name };
+      const body =
+        mode === 'login'
+          ? { email, password }
+          : {
+              email,
+              password,
+              name,
+              ...(inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
+            };
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -49,7 +59,6 @@ export function AuthPage({ onAuthSuccess, onBackToStorefront }: AuthPageProps) {
         throw new Error(data.error || 'Authentication failed');
       }
 
-      // Store credentials locally for offline persistence
       localStorage.setItem('countwise_token', data.accessToken);
       localStorage.setItem('countwise_refresh_token', data.refreshToken);
       localStorage.setItem('countwise_user', JSON.stringify(data.user));
@@ -85,42 +94,48 @@ export function AuthPage({ onAuthSuccess, onBackToStorefront }: AuthPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-stone-950 text-stone-100 selection:bg-amber-500/30 selection:text-amber-200">
+    <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-zinc-50">
       <div className="w-full max-w-md">
-        {onBackToStorefront && (
-          <div className="mb-4 text-center">
+        <div className="mb-5 flex items-center justify-between gap-2">
+          {onBackToStorefront ? (
             <button
               type="button"
               onClick={onBackToStorefront}
-              className="text-xs text-stone-400 hover:text-amber-400 transition inline-flex items-center gap-1 font-semibold cursor-pointer"
+              className="text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
-              ← Return to Online Store
+              <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.75} />
+              <span>Return to Online Store</span>
             </button>
-          </div>
-        )}
+          ) : (
+            <span />
+          )}
+          <ThemeToggleButton />
+        </div>
 
         {/* Header Branding */}
-        <div className="text-center mb-8">
-          <MegaHertzLogo variant="stacked" size="xl" showSubtitle={false} className="mb-3" />
-          <p className="text-xs text-stone-400 mt-2 max-w-xs mx-auto">
-            Offline-First PC Hardware POS, Custom Rig Builder & Multi-Terminal Sync
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-2">
+            <MegaHertzLogo variant="stacked" size="xl" showSubtitle={false} />
+          </div>
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-xs mx-auto">
+            Staff Portal for Gilmore Branch POS, Inventory Audit & Sync
           </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-stone-900/90 border border-stone-800 p-6 sm:p-8 rounded-2xl shadow-2xl backdrop-blur-xl">
+        {/* Auth Card */}
+        <div className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 p-6 sm:p-7 rounded-lg shadow-sm">
           {/* Tab Switcher */}
-          <div className="flex rounded-lg bg-stone-950 p-1 mb-6 border border-stone-800/80">
+          <div className="grid grid-cols-2 rounded-md bg-zinc-100 dark:bg-carbon-elevated p-1 mb-5 border border-zinc-200 dark:border-zinc-800">
             <button
               type="button"
               onClick={() => {
                 setMode('login');
                 setError(null);
               }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              className={`py-1.5 text-xs font-semibold rounded transition-colors cursor-pointer ${
                 mode === 'login'
-                  ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                  : 'text-stone-400 hover:text-stone-200'
+                  ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white'
               }`}
             >
               Log In
@@ -131,10 +146,10 @@ export function AuthPage({ onAuthSuccess, onBackToStorefront }: AuthPageProps) {
                 setMode('register');
                 setError(null);
               }}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              className={`py-1.5 text-xs font-semibold rounded transition-colors cursor-pointer ${
                 mode === 'register'
-                  ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                  : 'text-stone-400 hover:text-stone-200'
+                  ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white'
               }`}
             >
               Create Account
@@ -142,63 +157,116 @@ export function AuthPage({ onAuthSuccess, onBackToStorefront }: AuthPageProps) {
           </div>
 
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-950/50 border border-red-800/60 text-red-200 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div className="mb-4 p-3 rounded-md bg-red-50 dark:bg-rose-950/60 border border-red-200 dark:border-rose-800 text-red-800 dark:text-rose-200 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 dark:text-rose-400 shrink-0 mt-0.5" strokeWidth={1.75} />
               <span>{error}</span>
             </div>
           )}
 
           {!isOnline && (
-            <div className="mb-4 p-3 rounded-xl bg-amber-950/40 border border-amber-800/50 text-amber-300 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <span>You are currently offline. Sign in requires an initial internet connection, or use Local Demo Mode below.</span>
+            <div className="mb-4 p-3 rounded-md bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" strokeWidth={1.75} />
+              <span>
+                You are offline. Signing in requires an initial connection, or use Instant Offline
+                Workspace below.
+              </span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
               <div>
-                <label className="block text-xs font-medium text-stone-300 mb-1.5">Full Name</label>
+                <label
+                  htmlFor="staff-auth-name"
+                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5"
+                >
+                  Full Name
+                </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-2.5 w-4 h-4 text-stone-500" />
+                  <User
+                    className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400"
+                    strokeWidth={1.75}
+                  />
                   <input
+                    id="staff-auth-name"
                     type="text"
                     required
+                    autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Store Manager"
-                    className="w-full bg-stone-950/80 border border-stone-800 rounded-xl pl-9 pr-3.5 py-2 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 transition-all"
+                    className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3.5 pl-9 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-zinc-950 dark:focus:border-amber-500 transition-colors"
                   />
                 </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 w-4 h-4 text-stone-500" />
+            {mode === 'register' && (
+              <div>
+                <label
+                  htmlFor="staff-auth-invite"
+                  className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5"
+                >
+                  Staff Invite Code
+                </label>
                 <input
+                  id="staff-auth-invite"
+                  type="password"
+                  autoComplete="off"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  placeholder="Required for production staff signup"
+                  className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3.5 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-zinc-950 dark:focus:border-amber-500 transition-colors"
+                />
+              </div>
+            )}
+
+            <div>
+              <label
+                htmlFor="staff-auth-email"
+                className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5"
+              >
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail
+                  className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400"
+                  strokeWidth={1.75}
+                />
+                <input
+                  id="staff-auth-email"
                   type="email"
                   required
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="manager@store.com"
-                  className="w-full bg-stone-950/80 border border-stone-800 rounded-xl pl-9 pr-3.5 py-2 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 transition-all"
+                  className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3.5 pl-9 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-zinc-950 dark:focus:border-amber-500 transition-colors"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-stone-300 mb-1.5">Password</label>
+              <label
+                htmlFor="staff-auth-password"
+                className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5"
+              >
+                Password
+              </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-stone-500" />
+                <Lock
+                  className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400"
+                  strokeWidth={1.75}
+                />
                 <input
+                  id="staff-auth-password"
                   type="password"
                   required
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-stone-950/80 border border-stone-800 rounded-xl pl-9 pr-3.5 py-2 text-sm text-stone-100 placeholder-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 transition-all"
+                  className="w-full bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded px-3.5 pl-9 py-2 text-sm text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-zinc-950 dark:focus:border-amber-500 transition-colors"
                 />
               </div>
             </div>
@@ -206,34 +274,36 @@ export function AuthPage({ onAuthSuccess, onBackToStorefront }: AuthPageProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-2.5 px-4 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-stone-950 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md shadow-amber-950/40 cursor-pointer"
+              className="w-full mt-2 py-2.5 px-4 bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white active:bg-zinc-900 disabled:opacity-50 text-white dark:text-zinc-950 rounded-md text-sm font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               {loading ? (
                 <span>Authenticating...</span>
               ) : (
                 <>
                   <span>{mode === 'login' ? 'Sign In' : 'Create Store Account'}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4" strokeWidth={1.75} />
                 </>
               )}
             </button>
           </form>
 
-          <div className="mt-5 pt-4 border-t border-stone-800">
-            <button
-              type="button"
-              onClick={handleStartOfflineDemo}
-              data-testid="offline-demo-btn"
-              className="w-full py-2 px-3 rounded-xl bg-stone-950 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <WifiOff className="w-3.5 h-3.5 text-amber-400" />
-              <span>Try Instant Offline Workspace (No Server Required)</span>
-            </button>
-          </div>
+          {import.meta.env.DEV && (
+            <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={handleStartOfflineDemo}
+                data-testid="offline-demo-btn"
+                className="w-full py-2 px-3 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <WifiOff className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
+                <span>Try Instant Offline Workspace (No Server Required)</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        <p className="text-center text-xs text-stone-500 mt-6">
-          Offline PWA with Dexie.js & monotonic cursor synchronization
+        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400 mt-5">
+          Local-first POS storage powered by IndexedDB with automatic delta sync
         </p>
       </div>
     </div>

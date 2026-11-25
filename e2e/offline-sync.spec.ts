@@ -8,7 +8,7 @@ test.describe('Countwise Offline-First PWA & Multi-Device Sync E2E', () => {
     const pageA = await contextA.newPage();
 
     // 1. Register a store owner account on Device A while online
-    await pageA.goto('/');
+    await pageA.goto('/admin');
     await pageA.getByRole('button', { name: 'Create Account' }).click();
     await pageA.getByPlaceholder('Store Manager').fill('Staff A');
     const uniqueEmail = `staff_${Date.now()}@countwise.dev`;
@@ -16,7 +16,7 @@ test.describe('Countwise Offline-First PWA & Multi-Device Sync E2E', () => {
     await pageA.getByPlaceholder('••••••••').fill('password123');
     await pageA.getByRole('button', { name: 'Create Store Account' }).click();
 
-    await expect(pageA.getByTestId('tab-pos')).toBeVisible();
+    await expect(pageA.getByTestId('open-pos-route-btn')).toBeVisible();
     await pageA.getByTestId('tab-inventory').click();
 
     // 2. Switch Device A to Offline Mode (Airplane Mode simulation)
@@ -46,7 +46,7 @@ test.describe('Countwise Offline-First PWA & Multi-Device Sync E2E', () => {
     // 5. Open a second browser context (Device B), log in with the same store account, and verify convergence
     const contextB = await browser.newContext();
     const pageB = await contextB.newPage();
-    await pageB.goto('/');
+    await pageB.goto('/admin');
     await pageB.getByPlaceholder('manager@store.com').fill(uniqueEmail);
     await pageB.getByPlaceholder('••••••••').fill('password123');
     await pageB.getByRole('button', { name: 'Sign In' }).click();

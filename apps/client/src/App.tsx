@@ -5,6 +5,7 @@ import { usePersistentStorage } from './hooks/usePersistentStorage.js';
 import { useSyncEngine } from './hooks/useSyncEngine.js';
 import {
   syncPublicCatalog,
+  safeJsonParse,
   PUBLIC_CATALOG_REFRESH_EVENT,
   DEFAULT_STORE_FALLBACK,
 } from './services/publicCatalogSync.js';
@@ -22,6 +23,7 @@ import { StorefrontPage } from './pages/StorefrontPage.js';
 import { ProductDetailPage } from './pages/ProductDetailPage.js';
 import { ModalDialog } from './components/ModalDialog.js';
 import { MegaHertzLogo } from './components/MegaHertzLogo.js';
+import { ThemeToggleButton } from './components/ThemeToggleButton.js';
 import {
   ShoppingCart,
   Receipt,
@@ -40,13 +42,24 @@ import {
   X,
 } from 'lucide-react';
 
-type RouteMode = 'storefront' | 'pos' | 'admin';
+type RouteMode = 'storefront' | 'builder' | 'pos' | 'admin';
 
 function detectRouteMode(): RouteMode {
   if (typeof window === 'undefined') return 'storefront';
   const path = window.location.pathname.toLowerCase();
   const search = window.location.search.toLowerCase();
   const hash = window.location.hash.toLowerCase();
+
+  if (
+    path === '/builder' ||
+    path === '/pc-builder' ||
+    path.startsWith('/builder/') ||
+    search.includes('portal=builder') ||
+    hash === '#builder' ||
+    hash === '#/builder'
+  ) {
+    return 'builder';
+  }
 
   if (
     path === '/pos' ||
@@ -84,15 +97,6 @@ function getProductIdFromRoute(): string | null {
     return id || null;
   }
   return null;
-}
-
-function safeJsonParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
 }
 
 async function migrateFallbackStoreData(targetStoreId: string): Promise<void> {
@@ -154,10 +158,8 @@ export function App() {
   const [activeTab, setActiveTab] = useState<AdminTab>('sales');
   const [externalCart, setExternalCart] = useState<CartItem[]>([]);
   const [activeProductId, setActiveProductId] = useState<string | null>(() => getProductIdFromRoute());
-  const [isCustomerBuilderOpen, setIsCustomerBuilderOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // Admin Left Sidebar State (persisted collapse preference + mobile drawer state)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem('megahertz_admin_sidebar_collapsed') === 'true';
   });
@@ -181,7 +183,7 @@ export function App() {
   });
 
   const [stores, setStores] = useState<Array<{ id: string; name: string; role?: string }>>(() => [
-    { id: storeId, name: 'MegaHertz Depot — Flagship' },
+    { id: storeId, name: 'MegaHertz Depot Flagship' },
   ]);
   const [verifiedStoreIds, setVerifiedStoreIds] = useState<string[]>([]);
 
@@ -203,7 +205,6 @@ export function App() {
     triggerSync,
   } = useSyncEngine(syncTargetStoreId);
 
-  // Listen for browser navigation changes (e.g. forward/back to /pos, /admin, or /product/:id)
   useEffect(() => {
     const handlePopState = () => {
       setRouteMode(detectRouteMode());
@@ -238,6 +239,14 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const navigateToBuilder = () => {
+    window.history.pushState(null, '', '/builder');
+    setRouteMode('builder');
+    setActiveProductId(null);
+    setIsMobileSidebarOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const navigateToProduct = (productId: string) => {
     window.history.pushState(null, '', `/product/${productId}`);
     setRouteMode('storefront');
@@ -246,7 +255,6 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Fetch user's stores when online and authenticated, and migrate any orphaned demo data
   useEffect(() => {
     if (!token || token === 'offline_demo_token' || user?.role === 'customer' || !isOnline) {
       return;
@@ -282,7 +290,6 @@ export function App() {
     };
   }, [token, user?.role, isOnline]);
 
-  // Live queries from Dexie for current store
   const activeProductCount = useLiveQuery(
     () =>
       localDb.products
@@ -306,12 +313,32 @@ export function App() {
     0
   );
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (pendingOutboxCount > 0) {
       const confirmed = window.confirm(
         `Warning: You have ${pendingOutboxCount} unsynced offline changes. Logging out will keep them safely in this browser's local storage, but you cannot sync them until you log in again. Continue?`
       );
       if (!confirmed) return;
+    } else {
+      try {
+        await localDb.transaction(
+          'rw',
+          [localDb.products, localDb.orders, localDb.adjustments, localDb.outbox, localDb.meta],
+          async () => {
+            await Promise.all([
+              localDb.orders.clear(),
+              localDb.adjustments.clear(),
+              localDb.outbox.clear(),
+              localDb.meta.clear(),
+              localDb.products.toCollection().modify((prod) => {
+                delete prod.costPrice;
+              }),
+            ]);
+          }
+        );
+      } catch {
+        // Ignore IndexedDB cleanup error during sign-out
+      }
     }
 
     localStorage.removeItem('countwise_token');
@@ -334,9 +361,9 @@ export function App() {
     [token, storeId]
   );
 
-  // Sync public storefront catalog + stock whenever viewing storefront routes
+  // Sync public storefront catalog + stock whenever viewing customer routes (/ , /product/:id , /builder)
   useEffect(() => {
-    if (routeMode !== 'storefront') return;
+    if (routeMode !== 'storefront' && routeMode !== 'builder') return;
     let cancelled = false;
 
     const runSync = () => {
@@ -427,11 +454,25 @@ export function App() {
   };
 
   const activeStoreName =
-    stores.find((s) => s.id === storeId)?.name || 'MegaHertz Depot — Flagship';
+    stores.find((s) => s.id === storeId)?.name || 'MegaHertz Depot Flagship';
 
   const posCartTotalQty = externalCart.reduce((acc, i) => acc + i.quantity, 0);
 
-  // ================= 1. PUBLIC CONSUMER STOREFRONT ROUTE (`/`, `/product/:id`) =================
+  // ================= 1. PUBLIC STOREFRONT & FULL-PAGE RIG BUILDER =================
+  if (routeMode === 'builder') {
+    return (
+      <>
+        <PcBuilderPage
+          storeId={storeId}
+          storeName={activeStoreName}
+          currencySymbol={currencySymbol}
+          onBack={navigateToStorefront}
+        />
+        <ReloadPrompt />
+      </>
+    );
+  }
+
   if (routeMode === 'storefront') {
     if (activeProductId) {
       return (
@@ -442,90 +483,29 @@ export function App() {
             currencySymbol={currencySymbol}
             onBack={navigateToStorefront}
             onSelectProduct={navigateToProduct}
-            onOpenPcBuilder={() => setIsCustomerBuilderOpen(true)}
+            onOpenPcBuilder={navigateToBuilder}
           />
-
-          <ModalDialog
-            open={isCustomerBuilderOpen}
-            onClose={() => setIsCustomerBuilderOpen(false)}
-            title="Custom PC Rig Builder"
-            subtitle="Assemble compatible components and add your entire build to cart"
-            maxWidth="6xl"
-          >
-            <div className="max-h-[82vh] overflow-y-auto pr-1">
-              <PcBuilderPage
-                storeId={storeId}
-                storeName={activeStoreName}
-                currencySymbol={currencySymbol}
-                  onLoadBuildToCart={(parts) => {
-                    const raw = localStorage.getItem('megahertz_customer_cart');
-                    const currentCart = safeJsonParse<any[]>(raw, []);
-                    const updated = [...currentCart];
-                    for (const p of parts) {
-                      const idx = updated.findIndex((i: any) => i.product.id === p.id);
-                      if (idx >= 0) updated[idx].quantity += 1;
-                      else updated.push({ product: p, quantity: 1 });
-                    }
-                    localStorage.setItem('megahertz_customer_cart', JSON.stringify(updated));
-                    window.dispatchEvent(new CustomEvent('megahertz-cart-updated'));
-                    setIsCustomerBuilderOpen(false);
-                  }}
-                />
-              </div>
-            </ModalDialog>
-
-            <ReloadPrompt />
-          </>
-        );
-      }
-
-      return (
-        <>
-          <StorefrontPage
-            storeId={storeId}
-            currencySymbol={currencySymbol}
-            onOpenPcBuilder={() => setIsCustomerBuilderOpen(true)}
-            onSwitchToStaff={() => navigateToAdmin()}
-            onSelectProduct={navigateToProduct}
-            onResolvePublicStoreId={handleResolvePublicStoreId}
-          />
-
-          {/* Customer Custom PC Builder Modal */}
-          <ModalDialog
-            open={isCustomerBuilderOpen}
-            onClose={() => setIsCustomerBuilderOpen(false)}
-            title="Custom PC Rig Builder"
-            subtitle="Assemble compatible components and add your entire build to cart"
-            maxWidth="6xl"
-          >
-            <div className="max-h-[82vh] overflow-y-auto pr-1">
-              <PcBuilderPage
-                storeId={storeId}
-                storeName={activeStoreName}
-                currencySymbol={currencySymbol}
-                onLoadBuildToCart={(parts) => {
-                  const raw = localStorage.getItem('megahertz_customer_cart');
-                  const currentCart = safeJsonParse<any[]>(raw, []);
-                  const updated = [...currentCart];
-                  for (const p of parts) {
-                    const idx = updated.findIndex((i: any) => i.product.id === p.id);
-                    if (idx >= 0) updated[idx].quantity += 1;
-                    else updated.push({ product: p, quantity: 1 });
-                  }
-                  localStorage.setItem('megahertz_customer_cart', JSON.stringify(updated));
-                  window.dispatchEvent(new CustomEvent('megahertz-cart-updated'));
-                  setIsCustomerBuilderOpen(false);
-                }}
-              />
-            </div>
-          </ModalDialog>
-
           <ReloadPrompt />
         </>
       );
     }
 
-  // Staff / POS / Admin authentication gate
+    return (
+      <>
+        <StorefrontPage
+          storeId={storeId}
+          currencySymbol={currencySymbol}
+          onOpenPcBuilder={navigateToBuilder}
+          onSwitchToStaff={() => navigateToAdmin()}
+          onSelectProduct={navigateToProduct}
+          onResolvePublicStoreId={handleResolvePublicStoreId}
+        />
+        <ReloadPrompt />
+      </>
+    );
+  }
+
+  // ================= 2. STAFF AUTH GATE =================
   if (!token || !user || user.role === 'customer') {
     return (
       <>
@@ -538,29 +518,28 @@ export function App() {
     );
   }
 
-  // ================= 2. DEDICATED POS REGISTER ROUTE (`/pos`) =================
+  // ================= 3. DEDICATED POS REGISTER ROUTE (`/pos`) =================
   if (routeMode === 'pos') {
     return (
-      <div className="min-h-screen flex flex-col bg-stone-950 text-stone-100 selection:bg-amber-500 selection:text-stone-950">
-        {/* Dedicated POS Terminal Top Bar */}
-        <header className="sticky top-0 z-40 bg-stone-900/90 backdrop-blur-md border-b border-stone-800 px-4 py-3 sm:px-6">
+      <div className="min-h-[100dvh] flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-zinc-50">
+        <header className="sticky top-0 z-40 bg-white dark:bg-carbon border-b border-zinc-200 dark:border-zinc-800 px-4 py-2.5 sm:px-6">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <MegaHertzLogo variant="horizontal" size="md" showSubtitle={false} />
-              <div className="hidden lg:flex items-center gap-2 border-l border-stone-800 pl-3">
-                <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded bg-amber-500 text-stone-950 font-bold tracking-wider">
-                  POS Register Terminal
+              <div className="hidden lg:flex items-center gap-2 border-l border-zinc-200 dark:border-zinc-800 pl-3">
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40">
+                  POS Register
                 </span>
-                <div className="flex items-center gap-1.5 text-[11px] text-stone-300 bg-stone-950/80 border border-stone-800 rounded-lg px-2.5 py-1">
-                  <Store className="w-3.5 h-3.5 text-amber-400" />
+                <div className="flex items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 rounded px-2.5 py-1">
+                  <Store className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
                   <select
                     aria-label="Select store"
                     value={storeId}
                     onChange={(e) => handleSelectStore(e.target.value)}
-                    className="bg-transparent text-stone-200 font-medium focus:outline-none cursor-pointer"
+                    className="bg-transparent text-zinc-900 dark:text-zinc-100 font-medium focus:outline-none cursor-pointer"
                   >
                     {stores.map((s) => (
-                      <option key={s.id} value={s.id} className="bg-stone-900 text-white">
+                      <option key={s.id} value={s.id} className="bg-white dark:bg-carbon text-zinc-950 dark:text-zinc-50">
                         {s.name}
                       </option>
                     ))}
@@ -569,7 +548,7 @@ export function App() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="flex items-center gap-2">
               <SyncStatusIndicator
                 isOnline={isOnline}
                 status={syncStatus}
@@ -579,22 +558,34 @@ export function App() {
                 onOpenSyncScreen={() => navigateToAdmin('sync')}
               />
 
+              <ThemeToggleButton />
+
+              <button
+                type="button"
+                onClick={() => navigateToAdmin()}
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white dark:bg-carbon hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-800 dark:text-zinc-200 cursor-pointer transition-colors"
+              >
+                Admin
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(true)}
                 title="Terminal & Store Settings"
-                className="p-2 rounded-xl bg-stone-900 border border-stone-800 text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
+                aria-label="Terminal and Store Settings"
+                className="p-2 rounded-md bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-4 h-4" strokeWidth={1.75} />
               </button>
 
               <button
                 type="button"
                 onClick={handleLogout}
                 title="Log out"
-                className="p-2 rounded-xl bg-stone-900 border border-stone-800 text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
+                aria-label="Log out"
+                className="p-2 rounded-md bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-rose-700 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-4 h-4" strokeWidth={1.75} />
               </button>
             </div>
           </div>
@@ -602,18 +593,18 @@ export function App() {
 
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
           {syncStatus.authRequired && (
-            <div className="p-4 rounded-2xl bg-amber-950/50 border border-amber-700/70 text-amber-200 text-xs flex items-center justify-between gap-4">
+            <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-4">
               <div className="flex items-center gap-2.5">
-                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" strokeWidth={1.75} />
                 <span>
-                  Please log in again to sync. Your {pendingOutboxCount} offline changes are safely
-                  preserved in IndexedDB.
+                  Please sign in again to sync. Your {pendingOutboxCount} offline changes remain
+                  safely stored in this browser.
                 </span>
               </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-semibold cursor-pointer shrink-0"
+                className="px-3 py-1.5 rounded-md bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 font-semibold cursor-pointer shrink-0"
               >
                 Sign In Again
               </button>
@@ -631,14 +622,13 @@ export function App() {
           />
         </main>
 
-        {/* Terminal & Branch Settings Modal */}
         <ModalDialog
           open={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
-          title="POS Terminal & Store Branch Settings"
+          title="POS Terminal & Store Settings"
           maxWidth="4xl"
         >
-          <div className="max-h-[82vh] overflow-y-auto pr-1">
+          <div className="max-h-[80vh] overflow-y-auto pr-1">
             <SettingsPage
               user={user}
               currentStoreId={storeId}
@@ -659,7 +649,7 @@ export function App() {
     );
   }
 
-  // ================= 3. ADMIN INTERFACE (`/admin`, `/staff`) — ALL-IN-ONE COLLAPSIBLE LEFT SIDEBAR =================
+  // ================= 4. ADMIN OPERATIONS INTERFACE (`/admin`, `/staff`) =================
   const adminNavItems: Array<{
     id: AdminTab;
     label: string;
@@ -699,9 +689,8 @@ export function App() {
   ];
 
   const renderAdminSidebarContent = (collapsed: boolean, isMobile = false) => (
-    <div className="flex flex-col justify-between h-full select-none">
-      {/* Top Section: Brand Logo, Collapse Toggle & Active Branch Selector */}
-      <div className="p-3.5 space-y-3 border-b border-stone-800/80">
+    <div className="flex flex-col justify-between h-full">
+      <div className="p-3.5 space-y-3 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center justify-between gap-2">
           {collapsed && !isMobile ? (
             <div className="mx-auto">
@@ -715,49 +704,50 @@ export function App() {
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 cursor-pointer"
+              aria-label="Close navigation menu"
+              className="p-1.5 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" strokeWidth={1.75} />
             </button>
           ) : (
             <button
               type="button"
               onClick={toggleSidebarCollapsed}
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="p-1.5 rounded-lg bg-stone-950 border border-stone-800 text-stone-400 hover:text-white hover:border-amber-500/40 transition cursor-pointer shrink-0"
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="p-1.5 rounded-md bg-zinc-50 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer shrink-0"
             >
               {collapsed ? (
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.75} />
               ) : (
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.75} />
               )}
             </button>
           )}
         </div>
 
-        {/* Store Branch Selector & Movements Summary */}
         {!collapsed || isMobile ? (
           <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-stone-950 text-amber-400 border border-amber-500/30 font-semibold tracking-wider">
+            <div className="flex items-center justify-between text-xs">
+              <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40 font-medium">
                 Admin Operations
               </span>
-              <span className="flex items-center gap-1 text-[11px] text-stone-400">
-                <Layers className="w-3 h-3 text-amber-400" />
-                <strong className="text-stone-200 font-mono">{adjustmentCount}</strong> moves
+              <span className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400 tabular-nums">
+                <Layers className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" strokeWidth={1.75} />
+                <strong className="text-zinc-950 dark:text-zinc-50 font-mono">{adjustmentCount}</strong> moves
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs text-stone-300 bg-stone-950 border border-stone-800 rounded-xl px-2.5 py-2">
-              <Store className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <div className="flex items-center gap-1.5 text-xs text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 rounded px-2.5 py-1.5">
+              <Store className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" strokeWidth={1.75} />
               <select
                 aria-label="Select store"
                 value={storeId}
                 onChange={(e) => handleSelectStore(e.target.value)}
-                className="w-full min-w-0 bg-transparent text-stone-200 font-medium focus:outline-none cursor-pointer truncate text-xs"
+                className="w-full min-w-0 bg-transparent text-zinc-950 dark:text-zinc-50 font-medium focus:outline-none cursor-pointer truncate text-xs"
               >
                 {stores.map((s) => (
-                  <option key={s.id} value={s.id} className="bg-stone-900 text-white">
+                  <option key={s.id} value={s.id} className="bg-white dark:bg-carbon text-zinc-950 dark:text-zinc-50">
                     {s.name}
                   </option>
                 ))}
@@ -767,23 +757,16 @@ export function App() {
         ) : (
           <div
             title={`Active Branch: ${activeStoreName} (${adjustmentCount} movements)`}
-            className="flex flex-col items-center justify-center p-2 rounded-xl bg-stone-950 border border-stone-800 text-amber-400"
+            className="flex flex-col items-center justify-center p-2 rounded-md bg-zinc-50 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300"
           >
-            <Store className="w-4 h-4" />
-            <span className="text-[9px] font-mono text-stone-400 mt-0.5">{adjustmentCount}</span>
+            <Store className="w-4 h-4 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
+            <span className="text-[10px] font-mono text-zinc-600 dark:text-zinc-400 mt-0.5 tabular-nums">{adjustmentCount}</span>
           </div>
         )}
       </div>
 
-      {/* Middle Section: 4 Core Admin Operations */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
-        {(!collapsed || isMobile) && (
-          <div className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-stone-500">
-            Management Views
-          </div>
-        )}
-
-        <nav className="space-y-1.5" aria-label="Admin navigation">
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="space-y-1" aria-label="Admin navigation">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -798,26 +781,29 @@ export function App() {
                 data-testid={item.testId}
                 title={collapsed && !isMobile ? item.label : undefined}
                 className={`w-full flex items-center ${
-                  collapsed && !isMobile ? 'justify-center px-2 py-3' : 'justify-between px-3.5 py-2.5'
-                } rounded-xl text-xs font-semibold transition-all cursor-pointer relative ${
+                  collapsed && !isMobile ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2'
+                } rounded-md text-xs font-medium transition-colors cursor-pointer relative ${
                   isActive
-                    ? 'bg-amber-500 text-stone-950 font-bold shadow-md shadow-amber-950/40'
-                    : 'text-stone-400 hover:text-white hover:bg-stone-800/70'
+                    ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 font-semibold'
+                    : 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/70'
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon className="w-4 h-4 shrink-0" />
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon
+                    className={`w-4 h-4 shrink-0 ${isActive ? 'text-amber-400 dark:text-amber-600' : 'text-zinc-500 dark:text-zinc-400'}`}
+                    strokeWidth={1.75}
+                  />
                   {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
                 </div>
 
                 {item.badge !== undefined && (!collapsed || isMobile) && (
                   <span
-                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium tabular-nums shrink-0 ${
                       isActive
-                        ? 'bg-stone-950/20 text-stone-950'
+                        ? 'bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-950'
                         : item.badgeHighlight
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-stone-800 text-stone-300'
+                        ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40'
+                        : 'bg-zinc-100 dark:bg-carbon-elevated text-zinc-700 dark:text-zinc-300'
                     }`}
                   >
                     {item.badge}
@@ -825,7 +811,7 @@ export function App() {
                 )}
 
                 {item.badge !== undefined && collapsed && !isMobile && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-500" />
                 )}
               </button>
             );
@@ -833,49 +819,39 @@ export function App() {
         </nav>
       </div>
 
-      {/* Bottom Section: Portal Switchers, Sync Status, Settings & Account */}
-      <div className="p-3 border-t border-stone-800/80 space-y-2.5 bg-stone-950/40">
-        {(!collapsed || isMobile) && (
-          <div className="px-1 text-[10px] font-bold uppercase tracking-wider text-stone-500">
-            Portals & System
-          </div>
-        )}
-
-        {/* Dedicated POS Register Launcher */}
+      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2 bg-zinc-50 dark:bg-zinc-950/60">
         <button
           type="button"
           onClick={navigateToPos}
           data-testid="open-pos-route-btn"
           title={collapsed && !isMobile ? 'Launch POS Register (/pos)' : undefined}
           className={`w-full flex items-center ${
-            collapsed && !isMobile ? 'justify-center p-2.5' : 'justify-between px-3.5 py-2.5'
-          } rounded-xl bg-amber-500/15 hover:bg-amber-500 hover:text-stone-950 text-amber-300 border border-amber-500/30 text-xs font-bold transition cursor-pointer group`}
+            collapsed && !isMobile ? 'justify-center p-2.5' : 'justify-between px-3 py-2'
+          } rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold transition-colors cursor-pointer`}
         >
-          <div className="flex items-center gap-2.5">
-            <ShoppingCart className="w-4 h-4 shrink-0" />
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4 shrink-0" strokeWidth={1.75} />
             {(!collapsed || isMobile) && <span>POS Register</span>}
           </div>
           {posCartTotalQty > 0 && (!collapsed || isMobile) && (
-            <span className="px-1.5 py-0.2 rounded-full bg-stone-950 text-amber-400 text-[10px] font-mono">
+            <span className="px-1.5 py-0.2 rounded bg-zinc-950 text-white text-[10px] font-mono tabular-nums">
               {posCartTotalQty}
             </span>
           )}
         </button>
 
-        {/* Customer Storefront Switcher */}
         <button
           type="button"
           onClick={navigateToStorefront}
           title={collapsed && !isMobile ? 'View Public Storefront (/)' : undefined}
           className={`w-full flex items-center ${
-            collapsed && !isMobile ? 'justify-center p-2.5' : 'gap-2.5 px-3.5 py-2'
-          } rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-800 text-xs font-medium text-stone-300 hover:text-white transition cursor-pointer`}
+            collapsed && !isMobile ? 'justify-center p-2' : 'gap-2 px-3 py-2'
+          } rounded-md bg-white dark:bg-carbon hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-medium text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer`}
         >
-          <Globe className="w-4 h-4 text-amber-400 shrink-0" />
+          <Globe className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" strokeWidth={1.75} />
           {(!collapsed || isMobile) && <span>View Storefront</span>}
         </button>
 
-        {/* Sync Status Widget */}
         {!collapsed || isMobile ? (
           <div className="pt-1 flex justify-center">
             <SyncStatusIndicator
@@ -895,38 +871,40 @@ export function App() {
             type="button"
             onClick={() => setActiveTab('sync')}
             title={isOnline ? `Online (${pendingOutboxCount} pending)` : 'Offline'}
-            className="w-full flex justify-center p-2 rounded-xl bg-stone-900 border border-stone-800 text-xs cursor-pointer"
+            aria-label="Open Sync status"
+            className="w-full flex justify-center p-2 rounded-md bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-700 text-xs cursor-pointer"
           >
             <span
               className={`w-2.5 h-2.5 rounded-full ${
                 !isOnline
-                  ? 'bg-stone-500'
+                  ? 'bg-zinc-400'
                   : rejectedOutboxCount > 0
-                  ? 'bg-rose-500'
+                  ? 'bg-rose-600'
                   : pendingOutboxCount > 0
-                  ? 'bg-amber-400 animate-pulse'
-                  : 'bg-emerald-400'
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-600'
               }`}
             />
           </button>
         )}
 
-        {/* Settings & Account Footer */}
         <div
-          className={`pt-2 border-t border-stone-800/80 flex items-center ${
+          className={`pt-2 border-t border-zinc-200 dark:border-zinc-800 flex items-center ${
             collapsed && !isMobile ? 'flex-col gap-2' : 'justify-between gap-2'
           }`}
         >
           {(!collapsed || isMobile) && (
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] font-semibold text-stone-200 truncate">
+              <div className="text-[11px] font-medium text-zinc-900 dark:text-zinc-100 truncate">
                 {user.email}
               </div>
-              <div className="text-[10px] text-stone-500">Store Administrator</div>
+              <div className="text-[10px] text-zinc-600 dark:text-zinc-400">Store Administrator</div>
             </div>
           )}
 
-          <div className={`flex items-center ${collapsed && !isMobile ? 'flex-col' : ''} gap-1.5`}>
+          <div className={`flex items-center ${collapsed && !isMobile ? 'flex-col' : ''} gap-1`}>
+            <ThemeToggleButton />
+
             <button
               type="button"
               onClick={() => {
@@ -934,19 +912,21 @@ export function App() {
                 setIsMobileSidebarOpen(false);
               }}
               title="Store & Terminal Settings"
+              aria-label="Store and Terminal Settings"
               data-testid="open-settings-btn"
-              className="p-2 rounded-xl bg-stone-900 border border-stone-800 text-stone-400 hover:text-white hover:bg-stone-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-4 h-4" strokeWidth={1.75} />
             </button>
 
             <button
               type="button"
               onClick={handleLogout}
               title="Log out"
-              className="p-2 rounded-xl bg-stone-900 border border-stone-800 text-stone-400 hover:text-rose-400 hover:bg-stone-800 transition-colors cursor-pointer"
+              aria-label="Log out"
+              className="p-1.5 rounded-md bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-rose-700 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4" strokeWidth={1.75} />
             </button>
           </div>
         </div>
@@ -955,71 +935,67 @@ export function App() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-stone-950 text-stone-100 selection:bg-amber-500 selection:text-stone-950">
-      {/* Desktop Sticky Collapsible Left Sidebar */}
+    <div className="min-h-[100dvh] flex flex-col lg:flex-row bg-zinc-50 dark:bg-zinc-950 text-zinc-950 dark:text-zinc-50">
       <aside
-        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen bg-stone-900/95 border-r border-stone-800 transition-all duration-200 z-40 ${
-          isSidebarCollapsed ? 'w-20' : 'w-64'
+        className={`hidden lg:flex flex-col shrink-0 sticky top-0 h-screen bg-white dark:bg-carbon border-r border-zinc-200 dark:border-zinc-800 transition-all duration-150 z-40 ${
+          isSidebarCollapsed ? 'w-18' : 'w-64'
         }`}
       >
         {renderAdminSidebarContent(isSidebarCollapsed, false)}
       </aside>
 
-      {/* Mobile Top Bar (< lg) */}
-      <header className="lg:hidden sticky top-0 z-40 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+      <header className="lg:hidden sticky top-0 z-40 bg-white dark:bg-carbon border-b border-zinc-200 dark:border-zinc-800 px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setIsMobileSidebarOpen(true)}
             aria-label="Open navigation menu"
-            className="p-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-300 hover:text-white cursor-pointer"
+            className="p-1.5 rounded-md bg-zinc-50 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white cursor-pointer"
           >
-            <Menu className="w-4 h-4" />
+            <Menu className="w-4 h-4" strokeWidth={1.75} />
           </button>
           <MegaHertzLogo variant="horizontal" size="sm" showSubtitle={false} />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <ThemeToggleButton />
           <button
             type="button"
             onClick={navigateToPos}
-            className="px-3 py-1.5 rounded-xl bg-amber-500 text-stone-950 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
           >
-            <ShoppingCart className="w-3.5 h-3.5" />
+            <ShoppingCart className="w-3.5 h-3.5" strokeWidth={1.75} />
             <span>POS</span>
           </button>
         </div>
       </header>
 
-      {/* Mobile Slide-Over Sidebar Drawer */}
       {isMobileSidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
-            className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm"
+            className="fixed inset-0 bg-zinc-950/45 dark:bg-black/70"
             onClick={() => setIsMobileSidebarOpen(false)}
           />
-          <aside className="relative w-72 max-w-[85vw] h-full bg-stone-900 border-r border-stone-800 z-10">
+          <aside className="relative w-72 max-w-[85vw] h-full bg-white dark:bg-carbon border-r border-zinc-200 dark:border-zinc-800 z-10 shadow-xl">
             {renderAdminSidebarContent(false, true)}
           </aside>
         </div>
       )}
 
-      {/* Main Content Area (100% full vertical height on desktop) */}
       <main className="flex-1 min-w-0 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-5">
-        {/* Session Expired Re-login Prompt (Section 9: never delete local data) */}
         {syncStatus.authRequired && (
-          <div className="p-4 rounded-2xl bg-amber-950/50 border border-amber-700/70 text-amber-200 text-xs flex items-center justify-between gap-4">
+          <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" strokeWidth={1.75} />
               <span>
-                Please log in again to sync. Your {pendingOutboxCount} offline changes are safely
+                Please sign in again to sync. Your {pendingOutboxCount} offline changes remain safely
                 preserved in IndexedDB.
               </span>
             </div>
             <button
               type="button"
               onClick={handleLogout}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-semibold cursor-pointer shrink-0"
+              className="px-3 py-1.5 rounded-md bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 font-semibold cursor-pointer shrink-0"
             >
               Sign In Again
             </button>
@@ -1059,14 +1035,13 @@ export function App() {
         )}
       </main>
 
-      {/* Store & Terminal Settings Modal */}
       <ModalDialog
         open={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         title="Store Branch & Terminal Settings"
         maxWidth="4xl"
       >
-        <div className="max-h-[82vh] overflow-y-auto pr-1">
+        <div className="max-h-[80vh] overflow-y-auto pr-1">
           <SettingsPage
             user={user}
             currentStoreId={storeId}
@@ -1082,7 +1057,6 @@ export function App() {
         </div>
       </ModalDialog>
 
-      {/* Service Worker Update Prompt */}
       <ReloadPrompt />
     </div>
   );

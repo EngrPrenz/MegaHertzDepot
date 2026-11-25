@@ -77,8 +77,8 @@ export function ReceiptQuoteModal({
   const hasRma = Boolean(order?.notes?.includes('[RMA REPLACED]'));
 
   const title = isReceipt
-    ? `Official Receipt • ${order!.receiptNumber}`
-    : `PC Build Quotation • ${quote!.quoteNumber}`;
+    ? `Official Receipt · ${order!.receiptNumber}`
+    : `PC Build Quotation · ${quote!.quoteNumber}`;
 
   const validityDate = quote
     ? new Date(quote.createdAt + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()
@@ -87,7 +87,7 @@ export function ReceiptQuoteModal({
   const buildPlainTextDocument = (): string => {
     const lines: string[] = [];
     lines.push('====================================================');
-    lines.push(`        MEGAHERTZ DEPOT — ${storeName.toUpperCase()}`);
+    lines.push(`        MEGAHERTZ DEPOT - ${storeName.toUpperCase()}`);
     lines.push('   Computer Hardware, Custom Rigs & Peripherals');
     lines.push('====================================================');
 
@@ -151,7 +151,7 @@ export function ReceiptQuoteModal({
         lines.push(
           `[${entry.slot}] ${entry.product.name}${
             entry.product.sku ? ` (${entry.product.sku})` : ''
-          } — ${formatCurrency(entry.product.price || 0, currencySymbol)}`
+          } - ${formatCurrency(entry.product.price || 0, currencySymbol)}`
         );
         if (entry.product.warranty) {
           lines.push(`   Warranty: ${entry.product.warranty}`);
@@ -283,20 +283,21 @@ export function ReceiptQuoteModal({
       }}
       title={title}
       subtitle="MegaHertz Depot Official Hardware Documentation"
+      maxWidth="lg"
     >
       <div className="space-y-4 text-xs">
         {actionMsg && (
           <div
-            className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-medium ${
+            className={`p-3 rounded-md border flex items-center gap-2 text-xs font-medium ${
               actionMsg.type === 'success'
-                ? 'bg-emerald-950/60 border-emerald-700/70 text-emerald-200'
-                : 'bg-rose-950/60 border-rose-700/70 text-rose-200'
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                : 'bg-rose-50 dark:bg-rose-950/60 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
             }`}
           >
             {actionMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" strokeWidth={1.75} />
             ) : (
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-rose-700 dark:text-rose-400 shrink-0" strokeWidth={1.75} />
             )}
             <span>{actionMsg.text}</span>
           </div>
@@ -305,32 +306,31 @@ export function ReceiptQuoteModal({
         {/* Printable Receipt / Quote Paper Container */}
         <div
           data-testid="receipt-document"
-          className="p-4 rounded-xl bg-stone-950 border border-stone-800 space-y-3 font-mono"
+          className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-100 text-zinc-950 border border-zinc-200 dark:border-zinc-300 space-y-3 font-mono"
         >
-          <div className="text-center border-b border-stone-800 pb-3">
-            <div className="inline-flex items-center gap-1.5 text-amber-400 font-bold text-sm">
-              <Cpu className="w-4 h-4" />
+          <div className="text-center border-b border-zinc-200 pb-3">
+            <div className="inline-flex items-center gap-1.5 text-zinc-950 font-semibold text-sm">
+              <Cpu className="w-4 h-4 text-amber-700" strokeWidth={1.75} />
               <span>MEGAHERTZ DEPOT</span>
             </div>
-            <p className="text-[11px] text-stone-400">{storeName} • PC Hardware & Peripherals</p>
-            <p className="text-[10px] text-stone-500 mt-0.5">
+            <p className="text-[11px] text-zinc-600">{storeName} · PC Hardware &amp; Peripherals</p>
+            <p className="text-[11px] text-zinc-600 mt-0.5 tabular-nums">
               {isReceipt
-                ? `Receipt: ${order!.receiptNumber} • ${new Date(
+                ? `Receipt: ${order!.receiptNumber} · ${new Date(
                     order!.createdAt
                   ).toLocaleString()}`
-                : `Quote: ${quote!.quoteNumber} • ${new Date(quote!.createdAt).toLocaleString()}`}
+                : `Quote: ${quote!.quoteNumber} · ${new Date(quote!.createdAt).toLocaleString()}`}
             </p>
 
-            {/* Status Badges for Voided or RMA */}
             {isReceipt && (isVoided || hasRma) && (
               <div className="flex items-center justify-center gap-2 mt-2">
                 {isVoided && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-700/80 uppercase">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-800 border border-rose-200 uppercase">
                     VOIDED / REFUNDED
                   </span>
                 )}
                 {hasRma && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-700/80 uppercase">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 uppercase">
                     RMA WARRANTY SWAPPED
                   </span>
                 )}
@@ -341,7 +341,7 @@ export function ReceiptQuoteModal({
           {order && (
             <>
               {(order.customerName || order.customerPhone) && (
-                <div className="text-[11px] text-stone-300 border-b border-stone-800/80 pb-2">
+                <div className="text-[11px] text-zinc-700 border-b border-zinc-200 pb-2">
                   {order.customerName && <div>Customer: {order.customerName}</div>}
                   {order.customerPhone && <div>Contact: {order.customerPhone}</div>}
                 </div>
@@ -350,22 +350,22 @@ export function ReceiptQuoteModal({
               <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
                 {order.items.map((item, idx) => (
                   <div key={`${item.productId}-${idx}`} className="space-y-0.5">
-                    <div className="flex justify-between text-stone-100 font-semibold">
-                      <span className={isVoided ? 'line-through text-stone-500' : ''}>
+                    <div className="flex justify-between gap-2 text-zinc-950 font-semibold">
+                      <span className={isVoided ? 'line-through text-zinc-500' : ''}>
                         {item.quantity}x {item.productName}
                       </span>
-                      <span className={isVoided ? 'line-through text-stone-500' : 'text-amber-400'}>
+                      <span className={`tabular-nums shrink-0 ${isVoided ? 'line-through text-zinc-500' : 'text-zinc-950'}`}>
                         {formatCurrency(item.quantity * item.unitPrice, currencySymbol)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-stone-400">
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-600">
                       {item.sku && <span>SKU: {item.sku}</span>}
                       {item.warranty && (
-                        <span className="text-amber-400">• {item.warranty}</span>
+                        <span className="text-amber-800">· {item.warranty}</span>
                       )}
                     </div>
                     {item.serialNumbers && item.serialNumbers.filter(Boolean).length > 0 && (
-                      <div className="text-[10px] text-amber-300 bg-amber-950/30 px-2 py-0.5 rounded border border-amber-800/40">
+                      <div className="text-[10px] text-zinc-800 bg-white px-2 py-0.5 rounded border border-zinc-200">
                         S/N: {item.serialNumbers.filter(Boolean).join(', ')}
                       </div>
                     )}
@@ -373,47 +373,47 @@ export function ReceiptQuoteModal({
                 ))}
               </div>
 
-              <div className="border-t border-stone-800 pt-2.5 space-y-1 text-[11px]">
-                <div className="flex justify-between text-stone-400">
+              <div className="border-t border-zinc-200 pt-2.5 space-y-1 text-[11px] tabular-nums">
+                <div className="flex justify-between text-zinc-600">
                   <span>Subtotal</span>
                   <span>{formatCurrency(order.subtotal, currencySymbol)}</span>
                 </div>
                 {order.discountAmount > 0 && (
-                  <div className="flex justify-between text-amber-400">
+                  <div className="flex justify-between text-amber-800">
                     <span>Discount</span>
                     <span>-{formatCurrency(order.discountAmount, currencySymbol)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-stone-400">
+                <div className="flex justify-between text-zinc-600">
                   <span>
                     VAT ({order.taxRate}% {order.taxInclusive ? 'Included' : 'Added'})
                   </span>
                   <span>{formatCurrency(order.taxAmount, currencySymbol)}</span>
                 </div>
-                <div className="flex justify-between text-sm font-bold text-white pt-1 border-t border-stone-800">
+                <div className="flex justify-between text-sm font-semibold text-zinc-950 pt-1.5 border-t border-zinc-200">
                   <span>TOTAL ({order.paymentMethod})</span>
-                  <span className={isVoided ? 'line-through text-rose-400' : 'text-amber-400'}>
+                  <span className={isVoided ? 'line-through text-rose-700' : 'text-zinc-950'}>
                     {formatCurrency(order.totalAmount, currencySymbol)}
                   </span>
                 </div>
-                <div className="flex justify-between text-stone-400 text-[10px]">
+                <div className="flex justify-between text-zinc-600 text-[10px]">
                   <span>Tendered: {formatCurrency(order.amountTendered, currencySymbol)}</span>
                   <span>Change: {formatCurrency(order.changeDue, currencySymbol)}</span>
                 </div>
               </div>
 
               {order.notes && (
-                <div className="p-2 rounded-lg bg-stone-900 border border-stone-800 text-[10px] text-stone-300 space-y-0.5">
-                  <div className="font-bold text-stone-400 uppercase">Order & Audit Log:</div>
+                <div className="p-2.5 rounded bg-white border border-zinc-200 text-[10px] text-zinc-700 space-y-0.5">
+                  <div className="font-semibold text-zinc-900">Order &amp; Audit Log:</div>
                   <div className="leading-relaxed break-words">{order.notes}</div>
                 </div>
               )}
 
-              <div className="p-2 rounded-lg bg-amber-950/20 border border-amber-800/40 text-[10px] text-amber-300 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-amber-400" />
+              <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-[10px] text-amber-900 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-amber-700" strokeWidth={1.75} />
                 <span>
-                  Official Warranty Slip: Keep this receipt number ({order.receiptNumber}) and
-                  recorded Serial Numbers for RMA service.
+                  Official Warranty Slip: Keep receipt {order.receiptNumber} and recorded Serial
+                  Numbers for RMA service.
                 </span>
               </div>
             </>
@@ -421,30 +421,32 @@ export function ReceiptQuoteModal({
 
           {quote && (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] pb-2 border-b border-stone-800">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] pb-2 border-b border-zinc-200">
                 <div>
-                  <div className="text-stone-300">
+                  <div className="text-zinc-800">
                     Prepared For: <strong>{quote.customerName || 'Walk-in PC Builder'}</strong>
                   </div>
-                  <div className="text-[10px] text-stone-400 flex items-center gap-1 mt-0.5">
-                    <Calendar className="w-3 h-3 text-amber-400" />
+                  <div className="text-[10px] text-zinc-600 flex items-center gap-1 mt-0.5">
+                    <Calendar className="w-3 h-3 text-amber-700" strokeWidth={1.75} />
                     <span>Price Guarantee Valid Until: {validityDate}</span>
                   </div>
                 </div>
                 <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] ${
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${
                     quote.compatibility.isCompatible
-                      ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-700/60'
-                      : 'bg-rose-950/60 text-rose-300 border border-rose-700/60'
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border-rose-200'
                   }`}
                 >
                   {quote.compatibility.isCompatible ? (
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <CheckCircle2 className="w-3 h-3 text-emerald-700" strokeWidth={1.75} />
                   ) : (
-                    <AlertTriangle className="w-3 h-3 text-rose-400" />
+                    <AlertTriangle className="w-3 h-3 text-rose-700" strokeWidth={1.75} />
                   )}
-                  {quote.compatibility.estimatedSystemWatts}W Load • Rec. PSU:{' '}
-                  {quote.compatibility.recommendedPsuWatts}W+
+                  <span className="tabular-nums">
+                    {quote.compatibility.estimatedSystemWatts}W Load · Rec. PSU:{' '}
+                    {quote.compatibility.recommendedPsuWatts}W+
+                  </span>
                 </span>
               </div>
 
@@ -452,39 +454,37 @@ export function ReceiptQuoteModal({
                 {quote.parts.map(({ slot, product }, idx) => (
                   <div
                     key={`${slot}-${product.id}-${idx}`}
-                    className="flex justify-between gap-2 text-[11px] border-b border-stone-900 pb-1.5"
+                    className="flex justify-between gap-2 text-[11px] border-b border-zinc-200 pb-1.5 last:border-b-0"
                   >
                     <div className="min-w-0">
-                      <span className="text-amber-400 font-semibold">[{slot}]</span>{' '}
-                      <span className="text-stone-200 font-semibold">{product.name}</span>
-                      <div className="text-[10px] text-stone-500 flex items-center gap-2">
+                      <span className="text-amber-800 font-semibold">[{slot}]</span>{' '}
+                      <span className="text-zinc-950 font-semibold">{product.name}</span>
+                      <div className="text-[10px] text-zinc-600 flex items-center gap-2">
                         {product.sku && <span>SKU: {product.sku}</span>}
-                        {product.warranty && <span>• {product.warranty}</span>}
+                        {product.warranty && <span>· {product.warranty}</span>}
                       </div>
                     </div>
-                    <span className="text-amber-400 font-semibold shrink-0">
+                    <span className="text-zinc-950 font-semibold tabular-nums shrink-0">
                       {formatCurrency(product.price || 0, currencySymbol)}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t border-stone-800 pt-2.5 space-y-1 text-[11px]">
-                <div className="flex justify-between text-stone-400">
+              <div className="border-t border-zinc-200 pt-2.5 space-y-1 text-[11px] tabular-nums">
+                <div className="flex justify-between text-zinc-600">
                   <span>Parts Subtotal ({quote.parts.length} components)</span>
                   <span>{formatCurrency(quote.subtotal, currencySymbol)}</span>
                 </div>
                 {quote.discountAmount > 0 && (
-                  <div className="flex justify-between text-amber-400">
+                  <div className="flex justify-between text-amber-800">
                     <span>Full Rig Bundle Discount</span>
                     <span>-{formatCurrency(quote.discountAmount, currencySymbol)}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-sm font-bold text-white pt-1 border-t border-stone-800">
+                <div className="flex justify-between text-sm font-semibold text-zinc-950 pt-1.5 border-t border-zinc-200">
                   <span>QUOTED RIG TOTAL (VAT Incl.)</span>
-                  <span className="text-amber-400">
-                    {formatCurrency(quote.totalAmount, currencySymbol)}
-                  </span>
+                  <span>{formatCurrency(quote.totalAmount, currencySymbol)}</span>
                 </div>
               </div>
             </>
@@ -504,47 +504,47 @@ export function ReceiptQuoteModal({
                     setDefectiveSerial(order!.items[0].serialNumbers?.[0] || '');
                   }
                 }}
-                className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                className={`flex-1 py-2 px-3 rounded-md border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
                   activeAction === 'rma'
-                    ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                    : 'bg-stone-900 hover:bg-stone-800 border-stone-800 text-stone-300'
+                    ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-600 dark:border-amber-500 text-amber-900 dark:text-amber-300 font-semibold'
+                    : 'bg-white dark:bg-carbon-elevated hover:bg-zinc-50 dark:hover:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200'
                 }`}
               >
-                <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                <Wrench className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
                 <span>RMA Defective Swap</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveAction(activeAction === 'void' ? 'none' : 'void')}
-                className={`flex-1 py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                className={`flex-1 py-2 px-3 rounded-md border text-xs font-medium flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
                   activeAction === 'void'
-                    ? 'bg-rose-950/60 border-rose-500 text-rose-300'
-                    : 'bg-stone-900 hover:bg-stone-800 border-stone-800 text-stone-300 hover:text-rose-300'
+                    ? 'bg-rose-50 dark:bg-rose-950/60 border-rose-500 text-rose-800 dark:text-rose-200 font-semibold'
+                    : 'bg-white dark:bg-carbon-elevated hover:bg-zinc-50 dark:hover:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 hover:text-rose-700 dark:hover:text-rose-300'
                 }`}
               >
-                <Ban className="w-3.5 h-3.5 text-rose-400" />
+                <Ban className="w-3.5 h-3.5 text-rose-700 dark:text-rose-400" strokeWidth={1.75} />
                 <span>Void / Refund Receipt</span>
               </button>
             </div>
 
-            {/* RMA Replacement Drawer */}
             {activeAction === 'rma' && (
-              <div className="p-3.5 rounded-xl bg-stone-900 border border-amber-500/40 space-y-3">
+              <div className="p-3.5 rounded-lg bg-zinc-50 dark:bg-carbon-elevated border border-amber-300 dark:border-amber-500/50 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
-                    <Wrench className="w-3.5 h-3.5" />
+                  <h4 className="font-semibold text-zinc-950 dark:text-zinc-50 text-xs flex items-center gap-1.5">
+                    <Wrench className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" strokeWidth={1.75} />
                     <span>Process Warranty RMA Unit Replacement</span>
                   </h4>
-                  <span className="text-[10px] text-stone-400">Deducts 1 replacement unit</span>
+                  <span className="text-[10px] text-zinc-600 dark:text-zinc-400">Deducts 1 replacement unit</span>
                 </div>
 
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">
-                      Select Hardware Component on Receipt
+                    <label htmlFor="rma-product-select" className="block text-[11px] font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                      Hardware Component on Receipt
                     </label>
                     <select
+                      id="rma-product-select"
                       value={rmaProductId}
                       onChange={(e) => {
                         const pid = e.target.value;
@@ -552,7 +552,7 @@ export function ReceiptQuoteModal({
                         const found = order!.items.find((i) => i.productId === pid);
                         setDefectiveSerial(found?.serialNumbers?.[0] || '');
                       }}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                      className="w-full bg-white dark:bg-carbon border border-zinc-300 dark:border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-950 dark:text-zinc-50"
                     >
                       {order!.items.map((item) => (
                         <option key={item.productId} value={item.productId}>
@@ -564,41 +564,44 @@ export function ReceiptQuoteModal({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[11px] text-stone-400 mb-1">
+                      <label htmlFor="rma-defective-sn" className="block text-[11px] font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                         Returned Defective S/N
                       </label>
                       <input
+                        id="rma-defective-sn"
                         type="text"
                         value={defectiveSerial}
                         onChange={(e) => setDefectiveSerial(e.target.value)}
                         placeholder="Old S/N"
-                        className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                        className="w-full bg-white dark:bg-carbon border border-zinc-300 dark:border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-950 dark:text-zinc-50 font-mono"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] text-amber-300 font-semibold mb-1">
+                      <label htmlFor="rma-replacement-sn" className="block text-[11px] font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
                         New Replacement Unit S/N *
                       </label>
                       <input
+                        id="rma-replacement-sn"
                         type="text"
                         value={replacementSerial}
                         onChange={(e) => setReplacementSerial(e.target.value)}
                         placeholder="Scan or enter new S/N"
-                        className="w-full bg-stone-950 border border-amber-500/50 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                        className="w-full bg-white dark:bg-carbon border border-amber-600 dark:border-amber-500 rounded px-2.5 py-1.5 text-xs text-zinc-950 dark:text-zinc-50 font-mono"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] text-stone-400 mb-1">
+                    <label htmlFor="rma-issue-desc" className="block text-[11px] font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                       Defect / Diagnostic Findings
                     </label>
                     <input
+                      id="rma-issue-desc"
                       type="text"
                       value={rmaIssue}
                       onChange={(e) => setRmaIssue(e.target.value)}
-                      placeholder="e.g. No display output / Dead on arrival / Coil whine"
-                      className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                      placeholder="e.g. No display output / Dead on arrival"
+                      className="w-full bg-white dark:bg-carbon border border-zinc-300 dark:border-zinc-700 rounded px-2.5 py-1.5 text-xs text-zinc-950 dark:text-zinc-50"
                     />
                   </div>
                 </div>
@@ -607,7 +610,7 @@ export function ReceiptQuoteModal({
                   <button
                     type="button"
                     onClick={() => setActiveAction('none')}
-                    className="px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 text-xs"
+                    className="px-3 py-1.5 rounded-md bg-white dark:bg-carbon border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -615,7 +618,7 @@ export function ReceiptQuoteModal({
                     type="button"
                     disabled={busy}
                     onClick={handleConfirmRma}
-                    className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950 font-semibold text-xs cursor-pointer"
                   >
                     {busy ? 'Recording RMA...' : 'Confirm RMA Replacement'}
                   </button>
@@ -623,33 +626,33 @@ export function ReceiptQuoteModal({
               </div>
             )}
 
-            {/* Void / Refund Drawer */}
             {activeAction === 'void' && (
-              <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-700/60 space-y-3">
-                <h4 className="font-bold text-rose-300 text-xs flex items-center gap-1.5">
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Void Receipt & Refund Customer</span>
+              <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 space-y-3">
+                <h4 className="font-semibold text-rose-900 dark:text-rose-200 text-xs flex items-center gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
+                  <span>Void Receipt &amp; Refund Customer</span>
                 </h4>
 
                 <div>
-                  <label className="block text-[11px] text-stone-300 mb-1">
+                  <label htmlFor="void-reason-input" className="block text-[11px] font-medium text-rose-900 dark:text-rose-200 mb-1">
                     Reason for Void / Refund
                   </label>
                   <input
+                    id="void-reason-input"
                     type="text"
                     value={voidReason}
                     onChange={(e) => setVoidReason(e.target.value)}
-                    placeholder="e.g. Customer changed mind / Cashier entry error / Wrong socket ordered"
-                    className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
+                    placeholder="e.g. Customer changed mind / Cashier entry error"
+                    className="w-full bg-white dark:bg-carbon border border-rose-300 dark:border-rose-700 rounded px-2.5 py-1.5 text-xs text-zinc-950 dark:text-zinc-50"
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-[11px] text-stone-300 cursor-pointer">
+                <label className="flex items-center gap-2 text-[11px] text-rose-900 dark:text-rose-200 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={restockDamaged}
                     onChange={(e) => setRestockDamaged(e.target.checked)}
-                    className="rounded border-stone-700 text-amber-500 focus:ring-amber-500"
+                    className="rounded border-rose-300 text-amber-600 focus:ring-amber-600"
                   />
                   <span>
                     Items returned opened/defective (do not restock into sellable inventory)
@@ -660,7 +663,7 @@ export function ReceiptQuoteModal({
                   <button
                     type="button"
                     onClick={() => setActiveAction('none')}
-                    className="px-3 py-1.5 rounded-lg bg-stone-800 text-stone-300 text-xs"
+                    className="px-3 py-1.5 rounded-md bg-white dark:bg-carbon border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -668,7 +671,7 @@ export function ReceiptQuoteModal({
                     type="button"
                     disabled={busy}
                     onClick={handleConfirmVoid}
-                    className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs cursor-pointer"
                   >
                     {busy ? 'Processing Void...' : 'Confirm Void & Refund'}
                   </button>
@@ -678,21 +681,20 @@ export function ReceiptQuoteModal({
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
           <button
             type="button"
             onClick={handleCopySummary}
-            className="px-3 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-200 font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 rounded-md bg-white dark:bg-carbon hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-300">Copied!</span>
+                <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" strokeWidth={1.75} />
+                <span className="text-emerald-800 dark:text-emerald-300">Copied</span>
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5 text-amber-400" />
+                <Copy className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" strokeWidth={1.75} />
                 <span>Copy Text</span>
               </>
             )}
@@ -700,17 +702,17 @@ export function ReceiptQuoteModal({
           <button
             type="button"
             onClick={handleDownloadText}
-            className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-2 rounded-md bg-white dark:bg-carbon hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
             <span>Download (.txt)</span>
           </button>
           <button
             type="button"
             onClick={handlePrint}
-            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-md shadow-amber-950/40"
+            className="px-3.5 py-2 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950 font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
           >
-            <Printer className="w-3.5 h-3.5" />
+            <Printer className="w-3.5 h-3.5" strokeWidth={1.75} />
             <span>Print {isReceipt ? 'Receipt' : 'Quote'}</span>
           </button>
         </div>

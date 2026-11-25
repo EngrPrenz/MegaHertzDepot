@@ -18,3 +18,5 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: STAFF_INVITE_CODE
+        generateValue: true

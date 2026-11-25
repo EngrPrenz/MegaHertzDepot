@@ -1,57 +1,191 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-top: env(safe-area-inset-top);
+@custom-variant dark {
+  &:where(:root:has(> head > meta[name="color-scheme"][content="dark"]), :root:has(> head > meta[name="color-scheme"][content="dark"]) *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:has(> head > meta[name="color-scheme"][content="light dark"]), :root:has(> head > meta[name="color-scheme"][content="light dark"]) *) {
+      @slot;
+    }
   }
 }
 
-/* Custom Scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+@theme {
+  --font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-carbon: #111113;
+  --color-carbon-elevated: #18181b;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(12, 10, 9, 0.8);
+:root {
+  color-scheme: light dark;
+  --accent-brand: #d97706;
+  --scrollbar-track: #f4f4f5;
+  --scrollbar-thumb: #a1a1aa;
+  --selection-bg: #fde68a;
+  --selection-fg: #111113;
+  --backdrop-bg: rgba(17, 17, 19, 0.45);
+  --table-card-bg: #ffffff;
+  --table-card-border: #e4e4e7;
+  --table-row-divider: #f4f4f5;
+  --table-label-color: #52525b;
+  --cad-dot-color: rgba(9, 9, 11, 0.09);
+
+  @media (prefers-color-scheme: dark) {
+    --accent-brand: #f59e0b;
+    --scrollbar-track: #111113;
+    --scrollbar-thumb: #52525b;
+    --selection-bg: rgba(245, 158, 11, 0.28);
+    --selection-fg: #fafafa;
+    --backdrop-bg: rgba(0, 0, 0, 0.72);
+    --table-card-bg: #111113;
+    --table-card-border: #27272a;
+    --table-row-divider: #27272a;
+    --table-label-color: #a1a1aa;
+    --cad-dot-color: rgba(250, 250, 250, 0.08);
+  }
+
+  @supports (color: light-dark(white, black)) {
+    --accent-brand: light-dark(#d97706, #f59e0b);
+    --scrollbar-track: light-dark(#f4f4f5, #111113);
+    --scrollbar-thumb: light-dark(#a1a1aa, #52525b);
+    --selection-bg: light-dark(#fde68a, rgba(245, 158, 11, 0.28));
+    --selection-fg: light-dark(#111113, #fafafa);
+    --backdrop-bg: light-dark(rgba(17, 17, 19, 0.45), rgba(0, 0, 0, 0.72));
+    --table-card-bg: light-dark(#ffffff, #111113);
+    --table-card-border: light-dark(#e4e4e7, #27272a);
+    --table-row-divider: light-dark(#f4f4f5, #27272a);
+    --table-label-color: light-dark(#52525b, #a1a1aa);
+    --cad-dot-color: light-dark(rgba(9, 9, 11, 0.09), rgba(250, 250, 250, 0.08));
+  }
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(68, 64, 60, 0.8);
-  border-radius: 9999px;
+@layer base {
+  html {
+    accent-color: var(--accent-brand);
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top);
+  }
+
+  ::selection {
+    background-color: var(--selection-bg);
+    color: var(--selection-fg);
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  input:not([type="range"]):user-invalid,
+  textarea:user-invalid,
+  select:user-invalid {
+    border-color: #dc2626;
+  }
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(120, 113, 108, 1);
+/* Native top-layer modal scroll containment */
+dialog:modal {
+  overscroll-behavior: contain;
 }
 
-/* Glassmorphism helpers with warm obsidian stone tones */
-.glass-panel {
-  background: rgba(28, 25, 23, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(245, 158, 11, 0.1);
-}
-
-.glass-panel-interactive {
-  background: rgba(28, 25, 23, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.glass-panel-interactive:hover {
-  background: rgba(41, 37, 36, 0.85);
-  border-color: rgba(245, 158, 11, 0.3);
-  transform: translateY(-1px);
-}
-
-/* Native modal dialog backdrop styling (light-dismiss-a-dialog) */
 dialog::backdrop {
-  background-color: rgba(12, 10, 9, 0.75);
-  backdrop-filter: blur(4px);
+  background-color: var(--backdrop-bg);
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 
+/* Precision drafting dot grid for CAD Assembly Workbench */
+.cad-grid-bg {
+  background-image: radial-gradient(var(--cad-dot-color) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* Responsive container-driven data tables */
+.table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  container-type: inline-size;
+}
+
+.table-wrapper table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table-wrapper thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+}
+
+@container (width < 520px) {
+  .table-wrapper table,
+  .table-wrapper thead,
+  .table-wrapper tbody,
+  .table-wrapper tr,
+  .table-wrapper th,
+  .table-wrapper td {
+    display: block;
+  }
+
+  .table-wrapper thead {
+    display: none;
+  }
+
+  .table-wrapper tbody tr {
+    margin-block-end: 0.75rem;
+    border: 1px solid var(--table-card-border);
+    border-radius: 0.5rem;
+    background: var(--table-card-bg);
+    padding: 0.5rem 0.75rem;
+  }
+
+  .table-wrapper td[data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.375rem 0;
+    border-bottom: 1px solid var(--table-row-divider);
+    text-align: right;
+  }
+
+  .table-wrapper td[data-label]:last-child {
+    border-bottom: 0;
+  }
+
+  .table-wrapper td[data-label]::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--table-label-color);
+    text-align: left;
+    flex-shrink: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

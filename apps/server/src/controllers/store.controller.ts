@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { StoreService } from '../services/store.service.js';
+import { config } from '../config.js';
 import { z } from 'zod';
 
 const createStoreSchema = z.object({
@@ -11,6 +12,8 @@ const addMemberSchema = z.object({
   email: z.string().email(),
 });
 
+const storeIdParamSchema = z.string().uuid();
+
 export class StoreController {
   public static async list(req: Request, res: Response): Promise<void> {
     if (!req.user) {
@@ -21,7 +24,13 @@ export class StoreController {
       const stores = await StoreService.listUserStores(req.user.id);
       res.status(200).json({ stores });
     } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to fetch stores' });
+      console.error('Store list error:', error);
+      res.status(500).json({
+        error:
+          config.NODE_ENV === 'production'
+            ? 'Internal Server Error'
+            : error.message || 'Failed to fetch stores',
+      });
     }
   }
 
@@ -39,7 +48,13 @@ export class StoreController {
       const store = await StoreService.createStore(req.user.id, parsed.data.name, parsed.data.id);
       res.status(201).json({ store });
     } catch (error: any) {
-      res.status(400).json({ error: error.message || 'Failed to create store' });
+      console.error('Store create error:', error);
+      res.status(400).json({
+        error:
+          error?.message === 'Store name is required' || config.NODE_ENV !== 'production'
+            ? error.message || 'Failed to create store'
+            : 'Failed to create store',
+      });
     }
   }
 
@@ -48,18 +63,37 @@ export class StoreController {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const storeId = req.params.storeId as string;
+    const storeIdParsed = storeIdParamSchema.safeParse(req.params.storeId);
+    if (!storeIdParsed.success) {
+      res.status(400).json({ error: 'Invalid storeId parameter' });
+      return;
+    }
     const parsed = addMemberSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Valid email is required' });
       return;
     }
     try {
-      const member = await StoreService.addMemberByEmail(req.user.id, storeId, parsed.data.email);
+      const member = await StoreService.addMemberByEmail(
+        req.user.id,
+        storeIdParsed.data,
+        parsed.data.email
+      );
       res.status(200).json({ member });
     } catch (error: any) {
-      const status = error.message?.startsWith('Forbidden') ? 403 : 400;
-      res.status(status).json({ error: error.message || 'Failed to add member' });
+      const isKnown =
+        error?.message?.startsWith('Forbidden') ||
+        error?.message === 'Unable to add member for that email address';
+      const status = error.message?.startsWith('Forbidden') ? 403 : isKnown ? 400 : 500;
+      if (status >= 500) {
+        console.error('Store addMember error:', error);
+      }
+      res.status(status).json({
+        error:
+          config.NODE_ENV === 'production' && status >= 500
+            ? 'Internal Server Error'
+            : error.message || 'Failed to add member',
+      });
     }
   }
 }

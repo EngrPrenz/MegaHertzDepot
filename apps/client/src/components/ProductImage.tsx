@@ -26,92 +26,18 @@ interface ProductImageProps {
   alt?: string;
 }
 
-interface CategoryTheme {
-  icon: React.ComponentType<{ className?: string; size?: number }>;
-  accentBorder: string;
-  badgeBg: string;
-  badgeText: string;
-  iconColor: string;
-}
-
-const CATEGORY_THEMES: Record<string, CategoryTheme> = {
-  CPU: {
-    icon: Cpu,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-amber-400',
-  },
-  GPU: {
-    icon: Sparkles,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-amber-400',
-  },
-  Motherboard: {
-    icon: Server,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-amber-300',
-  },
-  RAM: {
-    icon: Layers,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-amber-400',
-  },
-  Storage: {
-    icon: HardDrive,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-stone-300',
-  },
-  PSU: {
-    icon: Zap,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-amber-500',
-  },
-  Case: {
-    icon: Box,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-stone-300',
-  },
-  Cooling: {
-    icon: Fan,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-cyan-400',
-  },
-  Monitor: {
-    icon: Monitor,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-stone-300',
-  },
-  Peripheral: {
-    icon: MousePointer,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-amber-400',
-  },
-  Laptop: {
-    icon: Laptop,
-    accentBorder: 'border-stone-800',
-    badgeBg: 'bg-stone-800/80',
-    badgeText: 'text-stone-300',
-    iconColor: 'text-amber-400',
-  },
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
+  CPU: Cpu,
+  GPU: Sparkles,
+  Motherboard: Server,
+  RAM: Layers,
+  Storage: HardDrive,
+  PSU: Zap,
+  Case: Box,
+  Cooling: Fan,
+  Monitor: Monitor,
+  Peripheral: MousePointer,
+  Laptop: Laptop,
 };
 
 function getInitials(name: string): string {
@@ -122,6 +48,15 @@ function getInitials(name: string): string {
     return (words[0][0] + words[1][0]).toUpperCase();
   }
   return clean.slice(0, 3).toUpperCase() || 'HW';
+}
+
+function isSafeImageSrc(src?: string | null): boolean {
+  if (!src) return false;
+  const trimmed = src.trim();
+  if (!trimmed || trimmed.startsWith('//')) return false;
+  if (trimmed.startsWith('/')) return true;
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return true;
+  return /^data:image\/(webp|png|jpeg|gif);base64,/i.test(trimmed);
 }
 
 export function ProductImage({
@@ -157,14 +92,14 @@ export function ProductImage({
   const candidates = useMemo(() => {
     const list: string[] = [];
     if (isLocalIdb) {
-      if (localRecord?.dataUrl) {
-        list.push(localRecord.dataUrl);
+      if (isSafeImageSrc(localRecord?.dataUrl)) {
+        list.push(localRecord!.dataUrl);
       }
-    } else if (imageUrl) {
-      list.push(imageUrl);
+    } else if (isSafeImageSrc(imageUrl)) {
+      list.push(imageUrl!);
     }
-    if (catalogFallbackUrl && !list.includes(catalogFallbackUrl)) {
-      list.push(catalogFallbackUrl);
+    if (isSafeImageSrc(catalogFallbackUrl) && !list.includes(catalogFallbackUrl!)) {
+      list.push(catalogFallbackUrl!);
     }
     return list;
   }, [isLocalIdb, localRecord?.dataUrl, imageUrl, catalogFallbackUrl]);
@@ -184,21 +119,18 @@ export function ProductImage({
     }
   }, [resolvedSrc]);
 
-  const theme = CATEGORY_THEMES[category] || CATEGORY_THEMES.Peripheral;
-  const CategoryIcon = theme.icon;
+  const CategoryIcon = CATEGORY_ICONS[category] || CATEGORY_ICONS.Peripheral;
   const initials = getInitials(name);
-
   const isInlineDataUrl = Boolean(resolvedSrc && resolvedSrc.startsWith('data:'));
 
-  // If valid resolved image and not exhausted, render img with fallback
   if (resolvedSrc) {
     return (
       <div
-        className={`relative overflow-hidden rounded-xl bg-stone-900 border border-stone-800/80 flex items-center justify-center ${className}`}
+        className={`relative overflow-hidden rounded-md bg-white dark:bg-zinc-100 border border-zinc-200 dark:border-zinc-700/80 flex items-center justify-center p-2 ${className}`}
       >
         {!isLoaded && !isInlineDataUrl && (
-          <div className="absolute inset-0 flex items-center justify-center animate-pulse bg-stone-900">
-            <CategoryIcon className="w-5 h-5 text-stone-600 opacity-40" />
+          <div className="absolute inset-0 flex items-center justify-center animate-pulse bg-zinc-100 dark:bg-zinc-200">
+            <CategoryIcon className="w-5 h-5 text-zinc-400 dark:text-zinc-500" strokeWidth={1.75} />
           </div>
         )}
         <img
@@ -208,47 +140,23 @@ export function ProductImage({
           decoding="async"
           onLoad={() => setIsLoaded(true)}
           onError={() => setCandidateIndex((idx) => idx + 1)}
-          className={`w-full h-full object-cover transition-all duration-200 ${
-            isLoaded || isInlineDataUrl ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          className={`w-full h-full object-contain transition-opacity duration-150 ${
+            isLoaded || isInlineDataUrl ? 'opacity-100' : 'opacity-0'
           }`}
         />
       </div>
     );
   }
 
-  // Render Category-Themed Dynamic SVG Placeholder
   return (
     <div
-      className={`relative overflow-hidden rounded-xl bg-stone-900/90 border border-stone-800 flex flex-col items-center justify-center select-none shadow-sm transition-transform ${className}`}
+      className={`relative overflow-hidden rounded-md bg-zinc-100 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center gap-1 p-1.5 text-center ${className}`}
       title={`${name} (${category})`}
     >
-      {/* Background SVG circuit / grid accents */}
-      <svg
-        className="absolute inset-0 w-full h-full opacity-10 pointer-events-none text-stone-500"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <pattern id="hw-grid" width="12" height="12" patternUnits="userSpaceOnUse">
-            <path d="M 12 0 L 0 0 0 12" fill="none" stroke="currentColor" strokeWidth="0.75" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#hw-grid)" />
-      </svg>
-
-      {/* Central Category Icon & Initials */}
-      <div className="relative z-10 flex flex-col items-center justify-center space-y-1 p-1 text-center">
-        <CategoryIcon className={`w-5 h-5 ${theme.iconColor} drop-shadow-sm`} />
-        <span
-          className={`text-[10px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded ${theme.badgeBg} ${theme.badgeText} border border-stone-700/60`}
-        >
-          {initials}
-        </span>
-      </div>
-
-      {/* Category indicator pill on top right */}
-      <div className="absolute bottom-1 right-1 px-1.5 py-0.5 text-[8px] font-mono text-stone-400 bg-stone-950/90 rounded border border-stone-800">
-        {category}
-      </div>
+      <CategoryIcon className="w-5 h-5 text-zinc-500 dark:text-zinc-400" strokeWidth={1.75} />
+      <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-white dark:bg-carbon text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+        {initials}
+      </span>
     </div>
   );
 }

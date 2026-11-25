@@ -1,13 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDb, ProductLocal, AdjustmentLocal } from '../db/index.js';
+import { localDb, ProductLocal } from '../db/index.js';
 import { localRepository } from '../services/localRepository.js';
+import { buildAdjustmentStockMap } from '../services/publicCatalogSync.js';
 import { ProductImage } from '../components/ProductImage.js';
-import {
-  computeDerivedStock,
-  HARDWARE_CATEGORIES,
-  HardwareCategory,
-} from '@countwise/shared';
+import { HARDWARE_CATEGORIES, HardwareCategory } from '@countwise/shared';
 import {
   CheckCircle2,
   ChevronLeft,
@@ -20,7 +17,7 @@ import {
   ListChecks,
   CreditCard,
   CheckCheck,
-  Sparkles,
+  Save,
 } from 'lucide-react';
 
 interface QuickCountPageProps {
@@ -29,11 +26,11 @@ interface QuickCountPageProps {
 }
 
 /**
- * Rapid shelf-counting & bulk physical audit screen (Section 11.5 & Week 5).
- * Supports both:
- * 1. "Batch Table Mode" — filter by category/search, edit physical counts across rows,
- *    1-click verify single items, or bulk-confirm all remaining/category items at once.
- * 2. "Card Walk Mode" — thumb-friendly single-card stepper with category filter & jump.
+ * Rapid shelf-counting & bulk physical audit screen.
+ * Supports:
+ * 1. "Fast Batch Table" - filter by category/search, edit physical counts across rows,
+ *    verify single rows, or bulk-confirm remaining/modified items at once.
+ * 2. "Single Card Walk" - thumb-friendly single-card stepper for aisle checks.
  */
 export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
   const [viewMode, setViewMode] = useState<'batch' | 'card'>('batch');
@@ -74,26 +71,15 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
     []
   );
 
-  // Compute expected stock for all products in one pass
-  const stockByProduct = useMemo(() => {
-    const grouped = new Map<string, AdjustmentLocal[]>();
-    for (const adj of adjustments) {
-      const list = grouped.get(adj.productId);
-      if (list) list.push(adj);
-      else grouped.set(adj.productId, [adj]);
-    }
-    const map = new Map<string, number>();
-    for (const p of products) {
-      map.set(p.id, computeDerivedStock(grouped.get(p.id) || []));
-    }
-    return map;
-  }, [products, adjustments]);
+  const stockByProduct = useMemo(
+    () => buildAdjustmentStockMap(products, adjustments),
+    [products, adjustments]
+  );
 
   const sortedProducts = useMemo(() => {
     return [...products].sort((a, b) => a.name.localeCompare(b.name));
   }, [products]);
 
-  // Filtered products based on Category, Search, and Verified status
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
     return sortedProducts.filter((p) => {
@@ -113,7 +99,6 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
     });
   }, [sortedProducts, selectedCategory, search, statusFilter, countedInSession]);
 
-  // Keep card mode index in bounds when filter changes
   useEffect(() => {
     if (currentIndex >= filteredProducts.length) {
       setCurrentIndex(Math.max(0, filteredProducts.length - 1));
@@ -127,7 +112,6 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
     draftCount !== '' ? Math.max(0, parseInt(draftCount, 10) || 0) : currentExpectedStock;
   const computedCardDelta = effectiveCardCount - currentExpectedStock;
 
-  // Helper to get effective count for a product in Batch Table mode
   const getBatchEffectiveCount = (productId: string): number => {
     const draft = batchDrafts[productId];
     if (draft !== undefined && draft !== '') {
@@ -150,7 +134,6 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
     setBatchDraftValue(productId, String(nextVal));
   };
 
-  // Single-card confirm handler
   const handleConfirmCardCount = async () => {
     if (!currentProduct) return;
     await localRepository.recordPhysicalCount({
@@ -171,7 +154,6 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
     }
   };
 
-  // Single row confirm in Batch mode
   const handleConfirmSingleRow = async (product: ProductLocal) => {
     const countVal = getBatchEffectiveCount(product.id);
     await localRepository.recordPhysicalCount({
@@ -191,7 +173,6 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
     });
   };
 
-  // Bulk confirm all modified drafts OR all unverified items in the current filtered view
   const handleBulkConfirm = async (mode: 'modified-only' | 'all-filtered') => {
     const targets =
       mode === 'modified-only'
@@ -206,7 +187,7 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
       showToast(
         mode === 'modified-only'
           ? 'No modified counts to save.'
-          : 'All visible items in this filter are already verified!'
+          : 'All visible items in this filter are already verified.'
       );
       return;
     }
@@ -238,7 +219,7 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
       });
 
       showToast(
-        `Verified ${targets.length} item${targets.length === 1 ? '' : 's'} in 1 click!`
+        `Verified ${targets.length} item${targets.length === 1 ? '' : 's'} successfully.`
       );
     } finally {
       setBulkBusy(false);
@@ -252,11 +233,11 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
 
   if (sortedProducts.length === 0) {
     return (
-      <div className="glass-panel rounded-2xl p-10 text-center space-y-2">
-        <Layers className="w-8 h-8 text-slate-500 mx-auto" />
-        <h3 className="text-sm font-semibold text-white">No Products to Count</h3>
-        <p className="text-xs text-slate-400">
-          Add products on the Inventory tab first to start a rapid shelf-counting session.
+      <div className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg p-10 text-center space-y-2">
+        <Layers className="w-8 h-8 text-zinc-400 mx-auto" strokeWidth={1.75} />
+        <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">No Products to Count</h3>
+        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          Add products in Inventory first to start a shelf-counting session.
         </p>
       </div>
     );
@@ -274,54 +255,56 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
   }).length;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="space-y-4">
       {toastMsg && (
-        <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-700/80 text-amber-200 text-xs font-semibold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+        <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs font-medium flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" strokeWidth={1.75} />
           <span>{toastMsg}</span>
         </div>
       )}
 
       {/* Session Progress & Mode Switcher Header */}
-      <div className="glass-panel p-4 sm:p-5 rounded-2xl space-y-3">
+      <div className="bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 p-4 sm:p-5 rounded-lg space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>Quick Shelf Count ({completedCount} / {sortedProducts.length} verified)</span>
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+            <h2 className="text-base font-semibold text-zinc-950 dark:text-zinc-50 flex items-center gap-2">
+              <span>
+                Quick Shelf Count ({completedCount} / {sortedProducts.length} verified)
+              </span>
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 tabular-nums">
                 {progressPct}%
               </span>
             </h2>
-            <p className="text-xs text-stone-400 mt-0.5">
-              Audit by category or bulk-verify matching shelf stock in one click instead of confirming 142 items one by one.
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
+              Audit by hardware category or bulk-verify matching shelf counts in one action.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* View Mode Toggle: Batch Table vs Single Card Walk */}
-            <div className="inline-flex rounded-xl bg-stone-950 p-1 border border-stone-800">
+            <div className="inline-flex rounded-md bg-zinc-100 dark:bg-carbon-elevated p-1 border border-zinc-200 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={() => setViewMode('batch')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   viewMode === 'batch'
-                    ? 'bg-amber-500 text-stone-950 font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
+                    ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white'
                 }`}
               >
-                <ListChecks className="w-3.5 h-3.5" />
+                <ListChecks className="w-3.5 h-3.5" strokeWidth={1.75} />
                 <span>Fast Batch Table</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('card')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer ${
+                className={`px-3 py-1.5 rounded text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
                   viewMode === 'card'
-                    ? 'bg-amber-500 text-stone-950 font-bold shadow'
-                    : 'text-stone-400 hover:text-white'
+                    ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white'
                 }`}
               >
-                <CreditCard className="w-3.5 h-3.5" />
+                <CreditCard className="w-3.5 h-3.5" strokeWidth={1.75} />
                 <span>Single Card Walk</span>
               </button>
             </div>
@@ -334,24 +317,24 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                 setCurrentIndex(0);
                 setDraftCount('');
               }}
-              className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:text-zinc-950 dark:hover:text-white text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />
               <span>Reset session</span>
             </button>
           </div>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full h-2 rounded-full bg-stone-900 overflow-hidden">
+        <div className="w-full h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
           <div
-            className="h-full bg-amber-500 transition-all duration-300"
+            className="h-full bg-amber-500 transition-[width] duration-200"
             style={{ width: `${progressPct}%` }}
           />
         </div>
 
         {/* Filters & Bulk Action Bar */}
-        <div className="pt-2 border-t border-stone-800/80 space-y-2.5">
+        <div className="pt-2.5 border-t border-zinc-200 dark:border-zinc-800 space-y-2.5">
           {/* Category Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             <button
@@ -360,17 +343,19 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                 setSelectedCategory('All');
                 setCurrentIndex(0);
               }}
-              className={`px-3 py-1 rounded-xl text-xs font-semibold shrink-0 transition cursor-pointer ${
+              className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition-colors cursor-pointer ${
                 selectedCategory === 'All'
-                  ? 'bg-amber-500 text-stone-950 font-bold'
-                  : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
+                  ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
+                  : 'bg-zinc-100 dark:bg-carbon-elevated text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
               }`}
             >
               All ({sortedProducts.length})
             </button>
             {HARDWARE_CATEGORIES.map((cat) => {
               const catProducts = sortedProducts.filter((p) => p.category === cat);
-              const catVerified = catProducts.filter((p) => countedInSession[p.id] !== undefined).length;
+              const catVerified = catProducts.filter(
+                (p) => countedInSession[p.id] !== undefined
+              ).length;
               return (
                 <button
                   key={cat}
@@ -379,16 +364,16 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                     setSelectedCategory(cat);
                     setCurrentIndex(0);
                   }}
-                  className={`px-3 py-1 rounded-xl text-xs font-semibold shrink-0 transition cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1 rounded-md text-xs font-semibold shrink-0 transition-colors cursor-pointer flex items-center gap-1.5 ${
                     selectedCategory === cat
-                      ? 'bg-amber-500 text-stone-950 font-bold'
+                      ? 'bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950'
                       : catVerified === catProducts.length && catProducts.length > 0
-                      ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/60'
-                      : 'bg-stone-900 text-stone-400 border border-stone-800 hover:text-white'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-zinc-100 dark:bg-carbon-elevated text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200/70 dark:hover:bg-zinc-800'
                   }`}
                 >
                   <span>{cat}</span>
-                  <span className="font-mono text-[10px] opacity-80">
+                  <span className="font-mono text-[11px] opacity-80 tabular-nums">
                     {catVerified}/{catProducts.length}
                   </span>
                 </button>
@@ -396,11 +381,14 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
             })}
           </div>
 
-          {/* Search, Status Filter & 1-Click Bulk Confirm Buttons */}
+          {/* Search, Status Filter & Bulk Confirm Buttons */}
           <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[240px]">
               <div className="relative flex-1 max-w-xs min-w-[180px]">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+                <Search
+                  className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                  strokeWidth={1.75}
+                />
                 <input
                   type="text"
                   value={search}
@@ -409,7 +397,7 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                     setCurrentIndex(0);
                   }}
                   placeholder="Search SKU, name, or brand..."
-                  className="w-full pl-8 pr-3 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-white placeholder-stone-500 focus:outline-none focus:border-amber-500"
+                  className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded text-xs text-zinc-950 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-950 dark:focus:border-amber-500"
                 />
               </div>
 
@@ -420,7 +408,7 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                   setStatusFilter(e.target.value as 'all' | 'unverified' | 'verified');
                   setCurrentIndex(0);
                 }}
-                className="px-2.5 py-1.5 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                className="px-2.5 py-1.5 bg-white dark:bg-carbon-elevated border border-zinc-300 dark:border-zinc-700 rounded text-xs text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-zinc-950 cursor-pointer"
               >
                 <option value="all">Show: All ({filteredProducts.length})</option>
                 <option value="unverified">Unverified Only ({unverifiedFilteredCount})</option>
@@ -430,16 +418,15 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
               </select>
             </div>
 
-            {/* 1-Click Bulk Actions */}
             <div className="flex flex-wrap items-center gap-2">
               {modifiedDraftsCount > 0 && (
                 <button
                   type="button"
                   disabled={bulkBusy}
                   onClick={() => handleBulkConfirm('modified-only')}
-                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold inline-flex items-center gap-1.5 shadow cursor-pointer transition"
+                  className="px-3.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Save className="w-3.5 h-3.5" strokeWidth={1.75} />
                   <span>Save {modifiedDraftsCount} Edited Count(s)</span>
                 </button>
               )}
@@ -449,9 +436,9 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                 disabled={bulkBusy || unverifiedFilteredCount === 0}
                 onClick={() => handleBulkConfirm('all-filtered')}
                 data-testid="bulk-verify-all-btn"
-                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-stone-950 text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-amber-950/30 cursor-pointer transition"
+                className="px-3.5 py-1.5 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white disabled:opacity-40 text-white dark:text-zinc-950 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
               >
-                <CheckCheck className="w-4 h-4" />
+                <CheckCheck className="w-4 h-4" strokeWidth={1.75} />
                 <span>
                   {bulkBusy
                     ? 'Verifying...'
@@ -465,149 +452,183 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
         </div>
       </div>
 
-      {/* ================= VIEW 1: FAST BATCH TABLE MODE ================= */}
+      {/* VIEW 1: FAST BATCH TABLE MODE */}
       {viewMode === 'batch' ? (
-        <div className="glass-panel rounded-2xl overflow-hidden border border-stone-800">
+        <div
+          className="table-wrapper bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 rounded-lg"
+          tabIndex={0}
+          role="region"
+          aria-label="Shelf count audit list"
+        >
           {filteredProducts.length === 0 ? (
-            <div className="p-10 text-center text-stone-400 text-xs">
+            <div className="p-10 text-center text-zinc-500 dark:text-zinc-400 text-xs">
               No products match your current category or search filter.
             </div>
           ) : (
-            <div className="max-h-[65vh] overflow-y-auto divide-y divide-stone-800/70">
-              {filteredProducts.map((product) => {
-                const expected = stockByProduct.get(product.id) ?? 0;
-                const effective = getBatchEffectiveCount(product.id);
-                const delta = effective - expected;
-                const isVerified = countedInSession[product.id] !== undefined;
-                const hasDraft = batchDrafts[product.id] !== undefined;
+            <div className="max-h-[65vh] overflow-y-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 z-10 bg-zinc-100 dark:bg-carbon-elevated border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-semibold">
+                  <tr>
+                    <th className="px-4 py-2.5">Hardware Item</th>
+                    <th className="px-4 py-2.5 text-right">Expected</th>
+                    <th className="px-4 py-2.5">Physical Count</th>
+                    <th className="px-4 py-2.5 text-right">Delta</th>
+                    <th className="px-4 py-2.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {filteredProducts.map((product) => {
+                    const expected = stockByProduct.get(product.id) ?? 0;
+                    const effective = getBatchEffectiveCount(product.id);
+                    const delta = effective - expected;
+                    const isVerified = countedInSession[product.id] !== undefined;
+                    const hasDraft = batchDrafts[product.id] !== undefined;
 
-                return (
-                  <div
-                    key={product.id}
-                    className={`p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
-                      isVerified
-                        ? 'bg-emerald-950/15 hover:bg-emerald-950/25'
-                        : hasDraft && delta !== 0
-                        ? 'bg-amber-950/20'
-                        : 'hover:bg-stone-900/50'
-                    }`}
-                  >
-                    {/* Left: Product Info */}
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <ProductImage
-                        imageUrl={product.imageUrl}
-                        sku={product.sku}
-                        name={product.name}
-                        category={product.category}
-                        className="w-11 h-11 rounded-xl shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-bold text-white text-xs sm:text-sm leading-snug">
-                            {product.name}
-                          </span>
-                          {isVerified && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 inline-flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Verified ({countedInSession[product.id]})
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-400 mt-0.5">
-                          <span className="text-amber-400 font-semibold">{product.category}</span>
-                          {product.sku && <span className="font-mono">• {product.sku}</span>}
-                          <span>
-                            • Expected: <strong className="text-stone-200 font-mono">{expected}</strong>
-                          </span>
-                          {delta !== 0 && (
-                            <span
-                              className={`font-mono font-bold px-1.5 py-0.2 rounded ${
-                                delta > 0
-                                  ? 'bg-amber-500/20 text-amber-300'
-                                  : 'bg-rose-500/20 text-rose-300'
-                              }`}
-                            >
-                              Delta: {delta > 0 ? `+${delta}` : delta}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Quick Stepper & 1-Click Confirm */}
-                    <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => stepBatchDraft(product.id, -5)}
-                          className="px-2 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 text-xs font-mono font-bold text-stone-300 cursor-pointer"
-                        >
-                          -5
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => stepBatchDraft(product.id, -1)}
-                          className="w-8 h-8 rounded-lg bg-stone-900 hover:bg-stone-800 border border-stone-800 flex items-center justify-center text-white cursor-pointer"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-
-                        <input
-                          type="number"
-                          min={0}
-                          value={
-                            batchDrafts[product.id] !== undefined
-                              ? batchDrafts[product.id]
-                              : String(expected)
-                          }
-                          onChange={(e) => setBatchDraftValue(product.id, e.target.value)}
-                          className={`w-16 h-8 text-center text-sm font-mono font-bold rounded-lg bg-stone-950 border focus:outline-none ${
-                            delta !== 0
-                              ? 'border-amber-500 text-amber-300'
-                              : 'border-stone-800 text-white focus:border-amber-500'
-                          }`}
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => stepBatchDraft(product.id, 1)}
-                          className="w-8 h-8 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 flex items-center justify-center text-amber-300 cursor-pointer"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => stepBatchDraft(product.id, 5)}
-                          className="px-2 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-xs font-mono font-bold text-amber-300 cursor-pointer"
-                        >
-                          +5
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmSingleRow(product)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition ${
-                          isVerified && !hasDraft
-                            ? 'bg-stone-800 text-emerald-300 border border-emerald-800/50 hover:bg-stone-700'
-                            : 'bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-sm'
+                    return (
+                      <tr
+                        key={product.id}
+                        className={`transition-colors ${
+                          isVerified
+                            ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-50 dark:hover:bg-emerald-950/35'
+                            : hasDraft && delta !== 0
+                            ? 'bg-amber-50/60 dark:bg-amber-950/20'
+                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                         }`}
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{isVerified && !hasDraft ? 'Re-verify' : 'Verify'}</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                        <td data-label="Hardware Item" className="px-4 py-2.5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <ProductImage
+                              imageUrl={product.imageUrl}
+                              sku={product.sku}
+                              name={product.name}
+                              category={product.category}
+                              className="w-10 h-10 shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="font-semibold text-zinc-950 dark:text-zinc-50 leading-snug">
+                                  {product.name}
+                                </span>
+                                {isVerified && (
+                                  <span className="px-1.5 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 inline-flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" strokeWidth={1.75} />
+                                    Verified ({countedInSession[product.id]})
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                <span className="font-medium text-amber-800 dark:text-amber-400">{product.category}</span>
+                                {product.sku && <span className="font-mono">{product.sku}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td
+                          data-label="Expected"
+                          className="px-4 py-2.5 text-right font-mono font-semibold text-zinc-800 dark:text-zinc-200 tabular-nums"
+                        >
+                          {expected}
+                        </td>
+
+                        <td data-label="Physical Count" className="px-4 py-2.5">
+                          <div className="flex items-center sm:justify-start justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => stepBatchDraft(product.id, -5)}
+                              aria-label={`Subtract 5 from ${product.name}`}
+                              className="px-2 py-1 rounded bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-mono font-semibold text-zinc-700 dark:text-zinc-200 cursor-pointer"
+                            >
+                              -5
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => stepBatchDraft(product.id, -1)}
+                              aria-label={`Subtract 1 from ${product.name}`}
+                              className="w-7 h-7 rounded bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-800 dark:text-zinc-200 cursor-pointer"
+                            >
+                              <Minus className="w-3.5 h-3.5" strokeWidth={1.75} />
+                            </button>
+
+                            <input
+                              type="number"
+                              min={0}
+                              aria-label={`Physical count for ${product.name}`}
+                              value={
+                                batchDrafts[product.id] !== undefined
+                                  ? batchDrafts[product.id]
+                                  : String(expected)
+                              }
+                              onChange={(e) => setBatchDraftValue(product.id, e.target.value)}
+                              className={`w-14 h-7 text-center text-xs font-mono font-bold rounded bg-white dark:bg-zinc-900 border tabular-nums focus:outline-none ${
+                                delta !== 0
+                                  ? 'border-amber-500 text-amber-800 dark:text-amber-300'
+                                  : 'border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-zinc-50 focus:border-zinc-950'
+                              }`}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => stepBatchDraft(product.id, 1)}
+                              aria-label={`Add 1 to ${product.name}`}
+                              className="w-7 h-7 rounded bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-950 border border-amber-300 dark:border-amber-800 flex items-center justify-center text-amber-800 dark:text-amber-300 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" strokeWidth={1.75} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => stepBatchDraft(product.id, 5)}
+                              aria-label={`Add 5 to ${product.name}`}
+                              className="px-2 py-1 rounded bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-950 border border-amber-300 dark:border-amber-800 text-xs font-mono font-semibold text-amber-800 dark:text-amber-300 cursor-pointer"
+                            >
+                              +5
+                            </button>
+                          </div>
+                        </td>
+
+                        <td data-label="Delta" className="px-4 py-2.5 text-right tabular-nums">
+                          {delta !== 0 ? (
+                            <span
+                              className={`font-mono font-bold px-1.5 py-0.5 rounded ${
+                                delta > 0
+                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                  : 'bg-red-50 dark:bg-rose-950/60 text-red-700 dark:text-rose-300 border border-red-200 dark:border-rose-800'
+                              }`}
+                            >
+                              {delta > 0 ? `+${delta}` : delta}
+                            </span>
+                          ) : (
+                            <span className="font-mono text-zinc-400">0</span>
+                          )}
+                        </td>
+
+                        <td data-label="Action" className="px-4 py-2.5 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmSingleRow(product)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                              isVerified && !hasDraft
+                                ? 'bg-white dark:bg-carbon-elevated text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50'
+                                : 'bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.75} />
+                            <span>{isVerified && !hasDraft ? 'Re-verify' : 'Verify'}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
       ) : (
-        /* ================= VIEW 2: SINGLE CARD WALK MODE ================= */
+        /* VIEW 2: SINGLE CARD WALK MODE */
         currentProduct && (
-          <div className="max-w-xl mx-auto glass-panel p-6 sm:p-8 rounded-3xl space-y-6 text-center">
-            <div className="flex items-center justify-between text-xs text-stone-400">
+          <div className="max-w-xl mx-auto bg-white dark:bg-carbon border border-zinc-200 dark:border-zinc-800 p-6 sm:p-7 rounded-lg space-y-5 text-center">
+            <div className="flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-400">
               <button
                 type="button"
                 disabled={currentIndex === 0}
@@ -615,13 +636,13 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                   setCurrentIndex((i) => Math.max(0, i - 1));
                   setDraftCount('');
                 }}
-                className="px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-800 disabled:opacity-40 inline-flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 disabled:opacity-40 inline-flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-4 h-4" strokeWidth={1.75} />
                 <span>Prev</span>
               </button>
 
-              <span className="font-mono">
+              <span className="font-mono tabular-nums">
                 Item {currentIndex + 1} of {filteredProducts.length}
               </span>
 
@@ -632,77 +653,89 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
                   setCurrentIndex((i) => Math.min(filteredProducts.length - 1, i + 1));
                   setDraftCount('');
                 }}
-                className="px-3 py-1.5 rounded-lg bg-stone-900 border border-stone-800 disabled:opacity-40 inline-flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 disabled:opacity-40 inline-flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <span>Skip</span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4" strokeWidth={1.75} />
               </button>
             </div>
 
-            <div>
-              {currentProduct.sku && (
-                <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-stone-900 border border-stone-800 text-stone-400">
-                  {currentProduct.sku}
-                </span>
-              )}
-              <h2 className="text-2xl font-extrabold text-white mt-2">{currentProduct.name}</h2>
-              <p className="text-xs text-stone-400 mt-1">
-                Expected Local Stock:{' '}
-                <strong className="text-stone-200">{currentExpectedStock}</strong>
-              </p>
+            <div className="flex flex-col items-center gap-3">
+              <ProductImage
+                imageUrl={currentProduct.imageUrl}
+                sku={currentProduct.sku}
+                name={currentProduct.name}
+                category={currentProduct.category}
+                className="w-24 h-24"
+              />
+              <div>
+                {currentProduct.sku && (
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-zinc-100 dark:bg-carbon-elevated border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300">
+                    {currentProduct.sku}
+                  </span>
+                )}
+                <h2 className="text-xl font-bold text-zinc-950 dark:text-zinc-50 mt-2">{currentProduct.name}</h2>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 tabular-nums">
+                  Expected Local Stock:{' '}
+                  <strong className="text-zinc-950 dark:text-zinc-50 font-mono">{currentExpectedStock}</strong>
+                </p>
+              </div>
             </div>
 
             {/* Large Touch-Friendly Count Input */}
             <div className="space-y-4">
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => adjustCardDraft(-5)}
-                  className="w-12 h-12 rounded-2xl bg-stone-900 hover:bg-stone-800 active:scale-95 border border-stone-800 text-sm font-bold text-stone-300 cursor-pointer"
+                  className="w-12 h-12 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-sm font-semibold text-zinc-800 dark:text-zinc-200 cursor-pointer transition-colors"
                 >
                   -5
                 </button>
                 <button
                   type="button"
                   onClick={() => adjustCardDraft(-1)}
-                  className="w-14 h-14 rounded-2xl bg-stone-900 hover:bg-stone-800 active:scale-95 border border-stone-800 flex items-center justify-center text-white cursor-pointer"
+                  aria-label="Decrease physical count by 1"
+                  className="w-14 h-14 rounded-md bg-white dark:bg-carbon-elevated hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-900 dark:text-zinc-100 cursor-pointer transition-colors"
                 >
-                  <Minus className="w-6 h-6" />
+                  <Minus className="w-5 h-5" strokeWidth={1.75} />
                 </button>
 
                 <input
                   type="number"
+                  aria-label="Physical count"
                   value={draftCount !== '' ? draftCount : String(currentExpectedStock)}
                   onChange={(e) => setDraftCount(e.target.value)}
                   data-testid="quick-count-input"
-                  className="w-28 h-16 text-center text-3xl font-extrabold bg-stone-950 border-2 border-amber-500/50 rounded-2xl text-white focus:outline-none focus:border-amber-400"
+                  className="w-28 h-14 text-center text-2xl font-bold bg-white dark:bg-zinc-900 border-2 border-zinc-950 dark:border-amber-500 rounded-md text-zinc-950 dark:text-zinc-50 tabular-nums focus:outline-none"
                 />
 
                 <button
                   type="button"
                   onClick={() => adjustCardDraft(1)}
-                  className="w-14 h-14 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 border border-amber-500/40 flex items-center justify-center text-amber-300 cursor-pointer"
+                  aria-label="Increase physical count by 1"
+                  className="w-14 h-14 rounded-md bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-950 border border-amber-300 dark:border-amber-800 flex items-center justify-center text-amber-800 dark:text-amber-300 cursor-pointer transition-colors"
                 >
-                  <Plus className="w-6 h-6" />
+                  <Plus className="w-5 h-5" strokeWidth={1.75} />
                 </button>
                 <button
                   type="button"
                   onClick={() => adjustCardDraft(5)}
-                  className="w-12 h-12 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 active:scale-95 border border-amber-500/40 text-sm font-bold text-amber-300 cursor-pointer"
+                  className="w-12 h-12 rounded-md bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-950 border border-amber-300 dark:border-amber-800 text-sm font-semibold text-amber-800 dark:text-amber-300 cursor-pointer transition-colors"
                 >
                   +5
                 </button>
               </div>
 
-              <div className="text-xs text-stone-400">
-                Adjustment Delta to Enqueue:{' '}
+              <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                Adjustment Delta to Record:{' '}
                 <span
-                  className={`font-mono font-bold ${
+                  className={`font-mono font-bold tabular-nums ${
                     computedCardDelta > 0
-                      ? 'text-amber-400'
+                      ? 'text-amber-700 dark:text-amber-400'
                       : computedCardDelta < 0
-                      ? 'text-rose-400'
-                      : 'text-stone-300'
+                      ? 'text-red-700 dark:text-rose-400'
+                      : 'text-zinc-800 dark:text-zinc-200'
                   }`}
                 >
                   {computedCardDelta >= 0 ? `+${computedCardDelta}` : computedCardDelta}
@@ -714,9 +747,9 @@ export function QuickCountPage({ storeId, userId }: QuickCountPageProps) {
               type="button"
               onClick={handleConfirmCardCount}
               data-testid="confirm-shelf-count-btn"
-              className="w-full py-3.5 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-stone-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-950/40 cursor-pointer"
+              className="w-full py-3 px-5 rounded-md bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-white text-white dark:text-zinc-950 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
             >
-              <CheckCircle2 className="w-5 h-5" />
+              <CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />
               <span>Confirm Count & Next Shelf Item</span>
             </button>
           </div>
